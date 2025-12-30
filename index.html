@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>课堂人脸签到系统（手机转一圈点名）</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <style>
+    body{background:#0f172a;color:#e2e8f0}
+    .video-container{position:relative;width:100%;max-width:720px;aspect-ratio:4/3;border:2px solid #334155;border-radius:12px;overflow:hidden;background:#000}
+    video{width:100%;height:100%;object-fit:cover}
+    canvas{position:absolute;top:0;left:0}
+    .scanner-line{position:absolute;width:100%;height:2px;background:#10b981;box-shadow:0 0 10px #10b981;animation:scan 3s linear infinite;opacity:.6}
+    @keyframes scan{0%{top:0%;opacity:0}10%{opacity:1}90%{opacity:1}100%{top:100%;opacity:0}}
+    /* Range Slider 样式 */
+    input[type=range]{-webkit-appearance:none;appearance:none;background:transparent}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;height:16px;width:16px;border-radius:50%;background:#3b82f6;cursor:pointer;margin-top:-6px}
+    input[type=range]::-webkit-slider-runnable-track{width:100%;height:4px;cursor:pointer;background:#334155;border-radius:2px}
+  </style>
+</head>
+<body class="min-h-screen p-4">
+  <!-- Loading -->
+  <div id="loadingOverlay" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/95">
+    <div class="w-14 h-14 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+    <div class="text-lg font-bold text-blue-300">模型加载中…</div>
+    <div class="text-xs text-slate-400 mt-2">首次约 10MB，耐心一下</div>
+  </div>
+
+  <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <!-- Left: Camera -->
+    <div class="lg:col-span-2 space-y-4">
+      <header class="flex items-center justify-between bg-slate-800 p-3 rounded-lg border border-slate-700">
+        <div class="flex items-center gap-3">
+          <div id="statusDot" class="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+          <h1 class="text-xl font-bold">Face<span class="text-blue-500">Attendance</span></h1>
+        </div>
+        <div id="clock" class="text-xs text-slate-400 font-mono"></div>
+      </header>
+
+      <div class="video-container">
+        <video id="video" autoplay muted playsinline></video>
+        <div id="scanLine" class="scanner-line hidden"></div>
+        <div id="floatingMsg" class="absolute bottom-6 left-1/2 -translate-x-1/2 px-5 py-2 rounded font-bold text-lg opacity-0 scale-95 transition-all"></div>
+      </div>
+
+      <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 flex items-center justify-between">
+        <div class="text-sm text-slate-300">
+          状态：<span id="systemState" class="font-bold text-white">待机</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="toggleScanLine()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded">扫描线</button>
+          <button onclick="toggleCamera()" class="text-xs bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded">切换摄像头</button>
+          <button onclick="resetToday()" class="text-xs bg-amber-600 hover:bg-amber-700 px-3 py-1 rounded">重置本次签到</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Panels -->
+    <div class="space-y-4">
+
+      <!-- Roster -->
+      <section class="bg-slate-800 p-4 rounded-lg border border-slate-700">
+        <h2 class="text-lg font-bold mb-3">① 班级名单</h2>
+        <textarea id="rosterInput" rows="5"
+          class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm"
+          placeholder="一行一个名字，例如：&#10;张三&#10;李四&#10;王五"></textarea>
+        <div class="flex gap-2 mt-2">
+          <button id="saveRosterBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 py-2 rounded font-bold text-sm">
+            保存名单
+          </button>
+          <button onclick="loadRosterToBox()" class="bg-slate-700 hover:bg-slate-600 px-3 rounded text-sm">加载</button>
+        </div>
+        <p class="text-xs text-slate-400 mt-2">名单只存本机浏览器 localStorage。</p>
+      </section>
+
+      <!-- 识别设置 -->
+      <section class="bg-slate-800 p-4 rounded-lg border border-slate-700">
+        <h2 class="text-lg font-bold mb-3 flex items-center gap-2">
+          <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+          识别设置
+        </h2>
+        <div class="flex flex-col gap-2">
+          <label class="text-sm text-slate-400 flex justify-between">
+            <span>差异容忍度 (阈值)</span>
+            <span id="thresholdDisplay" class="text-blue-400 font-bold">0.45</span>
+          </label>
+          <input type="range" id="thresholdRange" min="0.1" max="0.8" step="0.05" value="0.45" class="w-full">
+          <p class="text-xs text-slate-500 mt-1">
+            <span class="text-red-400">注意:</span> 数值越<span class="text-white">低</span>越严格，数值越<span class="text-white">高</span>越容易误判。
+          </p>
+        </div>
+      </section>
+
+      <!-- Register Face -->
+      <section class="bg-slate-800 p-4 rounded-lg border border-slate-700">
+        <h2 class="text-lg font-bold mb-3">② 录入人脸（拍摄或导入）</h2>
+        <div class="flex gap-2 mb-2">
+          <select id="studentSelect" class="flex-1 bg-slate-900 border border-slate-600 rounded p-2 text-sm"></select>
+          <button id="registerBtn" class="bg-green-600 hover:bg-green-700 px-4 rounded font-bold text-sm">
+            捕获录入
+          </button>
+        </div>
+
+        <div class="mt-3">
+          <label class="text-sm font-bold">批量导入图片：</label>
+          <input id="batchInput" type="file" multiple accept="image/*" class="mt-1 block w-full text-xs text-slate-300" />
+          <button onclick="batchImportFaces()" class="mt-2 bg-blue-500 hover:bg-blue-600 w-full py-1 rounded text-sm font-bold">导入并识别所有图片</button>
+        </div>
+
+        <p class="text-xs text-slate-400 mt-2">图片命名格式：学号-姓名.png（如：20230001-张三.png）</p>
+      </section>
+
+      <!-- Attendance Status -->
+      <section class="bg-slate-800 p-4 rounded-lg border border-slate-700">
+        <h2 class="text-lg font-bold mb-3">③ 本次签到</h2>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div class="bg-slate-900 rounded p-2">
+            已签到 <span id="presentCount" class="text-green-400 font-bold">0</span>
+            <div id="presentList" class="mt-2 space-y-1 max-h-40 overflow-auto text-green-200"></div>
+          </div>
+          <div class="bg-slate-900 rounded p-2">
+            未签到 <span id="absentCount" class="text-red-400 font-bold">0</span>
+            <div id="absentList" class="mt-2 space-y-1 max-h-40 overflow-auto text-red-200"></div>
+          </div>
+        </div>
+        <button onclick="exportAbsent()" class="mt-3 text-xs underline text-slate-300 hover:text-white">
+          导出未签到名单
+        </button>
+      </section>
+
+      <!-- Logs -->
+      <section class="bg-slate-900 p-3 rounded-lg border border-slate-700 h-36 overflow-auto font-mono text-xs">
+        <div class="text-slate-500 mb-2 border-b border-slate-700 pb-1">Log</div>
+        <div id="logs" class="space-y-1"></div>
+      </section>
+    </div>
+  </div>
+
+<script>
+/* ---------------- DOM ---------------- */
+const video = document.getElementById("video");
+const loadingOverlay = document.getElementById("loadingOverlay");
+const statusDot = document.getElementById("statusDot");
+const systemState = document.getElementById("systemState");
+const logs = document.getElementById("logs");
+const floatingMsg = document.getElementById("floatingMsg");
+const batchInput = document.getElementById("batchInput");
+
+const rosterInput = document.getElementById("rosterInput");
+const saveRosterBtn = document.getElementById("saveRosterBtn");
+const studentSelect = document.getElementById("studentSelect");
+const registerBtn = document.getElementById("registerBtn");
+
+const presentList = document.getElementById("presentList");
+const absentList = document.getElementById("absentList");
+const presentCount = document.getElementById("presentCount");
+const absentCount = document.getElementById("absentCount");
+
+/* ---------------- FaceAPI Model ---------------- */
+const MODEL_URL = "./models/";
+let isModelLoaded = false;
+let canvas;
+let labeledFaceDescriptors = [];
+let faceMatcher;
+
+/* ---------------- Attendance Data ---------------- */
+// roster: string[]
+// faceDB: [{label, descriptors:[number[]]}]
+let roster = [];
+let presentSet = new Set();
+let currentFacing = "environment";
+let currentThreshold = 0.45; // 识别阈值
+
+// 阈值控制
+const thresholdRange = document.getElementById("thresholdRange");
+const thresholdDisplay = document.getElementById("thresholdDisplay");
+
+thresholdRange.addEventListener("input", (e) => {
+  currentThreshold = parseFloat(e.target.value);
+  thresholdDisplay.textContent = currentThreshold.toFixed(2);
+});
+
+thresholdRange.addEventListener("change", (e) => {
+  addLog(`设置更新: 匹配阈值 -> ${currentThreshold}`);
+});
+
+/* ---------------- Utils ---------------- */
+function addLog(msg, type="info"){
+  const time = new Date().toLocaleTimeString();
+  const div = document.createElement("div");
+  div.className = type==="error" ? "text-red-400" : "text-slate-300";
+  div.innerHTML = `<span class="text-slate-500">[${time}]</span> ${msg}`;
+  logs.prepend(div);
+}
+
+let toastTimer = null; // toast 定时器
+
+function toast(text, ok=true){
+  // 清除之前的定时器
+  if(toastTimer) clearTimeout(toastTimer);
+  
+  floatingMsg.textContent = text;
+  floatingMsg.className =
+    "absolute bottom-6 left-1/2 -translate-x-1/2 px-5 py-2 rounded font-bold text-lg transition-all " +
+    (ok
+      ? "bg-green-500 text-black shadow-lg shadow-green-500/40 opacity-100 scale-100"
+      : "bg-red-600 text-white shadow-lg shadow-red-600/40 opacity-100 scale-100");
+  
+  // 0.5秒后自动隐藏
+  toastTimer = setTimeout(()=>{
+    floatingMsg.className = "absolute bottom-6 left-1/2 -translate-x-1/2 px-5 py-2 rounded font-bold text-lg transition-all opacity-0 scale-95";
+    toastTimer = null;
+  }, 500);
+}
+
+/* ---------------- Roster ---------------- */
+function saveRoster(){
+  const raw = rosterInput.value.trim();
+  roster = raw ? raw.split("\n").map(s=>s.trim()).filter(Boolean) : [];
+  localStorage.setItem("roster", JSON.stringify(roster));
+  buildSelect();
+  refreshAttendanceUI();
+  addLog(`名单已保存，共 ${roster.length} 人`);
+}
+saveRosterBtn.addEventListener("click", saveRoster);
+
+function loadRoster(){
+  roster = JSON.parse(localStorage.getItem("roster") || "[]");
+  buildSelect();
+  refreshAttendanceUI();
+}
+function loadRosterToBox(){
+  loadRoster();
+  rosterInput.value = roster.join("\n");
+  addLog("名单已加载到文本框");
+}
+
+function buildSelect(){
+  studentSelect.innerHTML = "";
+  if(roster.length===0){
+    const opt = document.createElement("option");
+    opt.textContent="请先保存名单";
+    opt.value="";
+    studentSelect.append(opt);
+    return;
+  }
+  roster.forEach(name=>{
+    const opt = document.createElement("option");
+    opt.value=name;
+    opt.textContent=name;
+    studentSelect.append(opt);
+  });
+}
+
+/* ---------------- FaceDB LocalStorage ---------------- */
+function addFaceToStorage(label, descriptorArray){
+  let db = JSON.parse(localStorage.getItem("faceDB") || "[]");
+  let user = db.find(u=>u.label===label);
+  if(user) user.descriptors.push(descriptorArray);
+  else db.push({label, descriptors:[descriptorArray]});
+  localStorage.setItem("faceDB", JSON.stringify(db));
+}
+
+function loadFacesFromStorage(){
+  const db = JSON.parse(localStorage.getItem("faceDB") || "[]");
+  labeledFaceDescriptors = db.map(u=>{
+    const fds = u.descriptors.map(d=>new Float32Array(d));
+    return new faceapi.LabeledFaceDescriptors(u.label, fds);
+  });
+  addLog(`已加载人脸库：${db.length} 人`);
+}
+
+/* ---------------- Register Face ---------------- */
+registerBtn.addEventListener("click", async ()=>{
+  const name = studentSelect.value;
+  if(!name){ alert("请先保存名单并选择学生"); return; }
+
+  registerBtn.disabled = true;
+  registerBtn.textContent = "录入中…";
+
+  try{
+    const det = await faceapi.detectSingleFace(video)
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+
+    if(!det){ alert("没检测到人脸，请正对镜头"); return; }
+
+    const descArray = Array.from(det.descriptor);
+    addFaceToStorage(name, descArray);
+    loadFacesFromStorage();
+    addLog(`录入成功：${name}`);
+    toast(`录入成功：${name}`, true);
+  }catch(e){
+    console.error(e);
+    addLog("录入失败", "error");
+    alert("录入失败，请重试");
+  }finally{
+    registerBtn.disabled = false;
+    registerBtn.textContent = "捕获录入";
+  }
+});
+
+/* ---------------- Batch Import ---------------- */
+async function batchImportFaces(){
+  if(batchInput.files.length===0){alert("请选择图片文件");return;}
+  addLog("开始批量识别…");
+
+  for(const file of batchInput.files){
+    const img=await faceapi.bufferToImage(file);
+    const det=await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+    if(!det){addLog(file.name+":未检测到人脸");continue;}
+
+    // 去掉文件扩展名，保留完整的"学号-姓名"作为标签
+    const label = file.name.replace(/\.(jpg|png|jpeg|bmp|webp)$/i,"");
+    addFaceToStorage(label, Array.from(det.descriptor));
+    addLog("已导入："+label);
+  }
+
+  loadFacesFromStorage();
+  
+  // 自动从人脸库更新名单
+  updateRosterFromFaceDB();
+  
+  alert("批量导入完成");
+}
+
+/* ---------------- 从人脸库更新名单 ---------------- */
+function updateRosterFromFaceDB(){
+  const db = JSON.parse(localStorage.getItem("faceDB") || "[]");
+  if(db.length > 0){
+    // 用人脸库的标签作为名单
+    roster = db.map(u => u.label);
+    localStorage.setItem("roster", JSON.stringify(roster));
+    buildSelect();
+    refreshAttendanceUI();
+    addLog(`名单已从人脸库更新，共 ${roster.length} 人`);
+  }
+}
+
+/* ---------------- Attendance ---------------- */
+let lastToastName = ""; // 记录上次提示的人名，避免重复提示
+let lastToastTime = 0;  // 记录上次提示时间
+
+function markPresent(name){
+  if(!presentSet.has(name)){
+    presentSet.add(name);
+    localStorage.setItem("presentSet", JSON.stringify([...presentSet]));
+    refreshAttendanceUI();
+    
+    // 防止短时间内重复显示同一人的提示
+    const now = Date.now();
+    if(name !== lastToastName || now - lastToastTime > 3000){
+      addLog(`签到成功：${name}`);
+      toast(`签到：${name}`, true);
+      lastToastName = name;
+      lastToastTime = now;
+    }
+  }
+  // 已签到的人不再重复提示
+}
+
+function loadToday(){
+  presentSet = new Set(JSON.parse(localStorage.getItem("presentSet")||"[]"));
+}
+function resetToday(){
+  if(confirm("确定重置本次签到？")){
+    presentSet.clear();
+    localStorage.removeItem("presentSet");
+    refreshAttendanceUI();
+    addLog("本次签到已重置");
+  }
+}
+
+function refreshAttendanceUI(){
+  // present
+  presentList.innerHTML = "";
+  const presentArr = roster.filter(n=>presentSet.has(n));
+  presentArr.forEach(n=>{
+    const div = document.createElement("div");
+    div.textContent = "✅ " + n;
+    presentList.append(div);
+  });
+
+  // absent
+  absentList.innerHTML="";
+  const absentArr = roster.filter(n=>!presentSet.has(n));
+  absentArr.forEach(n=>{
+    const div=document.createElement("div");
+    div.textContent="⛔ " + n;
+    absentList.append(div);
+  });
+
+  presentCount.textContent = presentArr.length;
+  absentCount.textContent = absentArr.length;
+}
+
+function exportAbsent(){
+  const absentArr = roster.filter(n=>!presentSet.has(n));
+  const text = absentArr.join("\n") || "全部已签到";
+  navigator.clipboard?.writeText(text);
+  alert("未签到名单已复制到剪贴板：\n\n" + text);
+}
+
+/* ---------------- Camera Functions ---------------- */
+function toggleCamera(){
+  currentFacing = currentFacing === "environment" ? "user" : "environment";
+  startVideo();
+}
+
+/* ---------------- Init Models & Camera ---------------- */
+async function loadModels(){
+  try{
+    addLog("加载模型中…");
+    
+    // 尝试多个CDN源
+    const MODEL_URLS = [
+      "https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js@0.22.2/weights/",
+      "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights",
+      "https://unpkg.com/face-api.js@0.22.2/weights",
+      "./models", // 本地模型文件夹
+      "../models", // 可能的相对路径
+      "models/"   // 另一种可能的相对路径
+    ];
+    
+    let loaded = false;
+    let lastError = null;
+    
+    for (const MODEL_URL of MODEL_URLS) {
+      try {
+        addLog(`尝试从 ${MODEL_URL} 加载模型...`);
+        
+        await Promise.all([
+          faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+        ]);
+        
+        loaded = true;
+        addLog(`成功从 ${MODEL_URL} 加载模型！`);
+        break;
+      } catch (err) {
+        lastError = err;
+        addLog(`从 ${MODEL_URL} 加载模型失败: ${err.message}`);
+      }
+    }
+    
+    if (!loaded) {
+      throw lastError || new Error("所有模型源均加载失败");
+    }
+    
+    isModelLoaded = true;
+    addLog("模型加载完成");
+    startVideo();
+  }catch(e){
+    console.error(e);
+    addLog("模型加载失败", "error");
+    loadingOverlay.innerHTML = `<div class="text-red-400 font-bold">模型加载失败，请检查网络</div>`;
+    
+    // 创建一个手动下载模型的按钮
+    const downloadBtn = document.createElement('button');
+    downloadBtn.textContent = '点击下载模型文件';
+    downloadBtn.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded z-50';
+    downloadBtn.onclick = () => window.open('https://github.com/justadudewhohacks/face-api.js/releases', '_blank');
+    document.body.appendChild(downloadBtn);
+  }
+}
+
+function startVideo(){
+  navigator.mediaDevices.getUserMedia({video:{facingMode:currentFacing}})
+    .then(stream=>{
+      video.srcObject=stream;
+      addLog("摄像头已连接");
+    })
+    .catch(err=>{
+      console.error(err);
+      addLog("无法访问摄像头", "error");
+      alert("无法访问摄像头，请用 https 打开页面");
+    });
+}
+
+video.addEventListener("play", ()=>{
+  loadingOverlay.classList.add("hidden");
+  statusDot.classList.replace("bg-red-500","bg-green-500");
+  systemState.textContent="运行中";
+
+  canvas = faceapi.createCanvasFromMedia(video);
+  document.querySelector(".video-container").append(canvas);
+
+  const displaySize = {width: video.videoWidth||640, height: video.videoHeight||480 };
+  faceapi.matchDimensions(canvas, displaySize);
+
+  loadFacesFromStorage();
+
+  setInterval(async ()=>{
+    if(!isModelLoaded) return;
+
+    const dets = await faceapi.detectAllFaces(video, new faceapi.SsdMobilenetv1Options({minConfidence:.5}))
+      .withFaceLandmarks()
+      .withFaceDescriptors();
+
+    const resized = faceapi.resizeResults(dets, displaySize);
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    if(labeledFaceDescriptors.length===0){
+      faceapi.draw.drawDetections(canvas,resized);
+      return;
+    }
+
+    faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, currentThreshold);
+
+    resized.forEach((d,i)=>{
+      const best = faceMatcher.findBestMatch(d.descriptor);
+      const box = d.detection.box;
+      const {label, distance} = best;
+
+      let color="#ef4444", text="未知";
+      if(label!=="unknown"){
+        color="#10b981";
+        const conf = Math.max(0, Math.round((1-distance)*100));
+        text = `${label} (${conf}%)`;
+        markPresent(label);
+      }
+
+      new faceapi.draw.DrawBox(box, {label:text, boxColor:color}).draw(canvas);
+    });
+  }, 150);
+});
+
+/* ---------------- UI ---------------- */
+function toggleScanLine(){
+  document.getElementById("scanLine").classList.toggle("hidden");
+}
+setInterval(()=>{ document.getElementById("clock").textContent=new Date().toLocaleTimeString(); },1000);
+
+/* ---------------- Boot ---------------- */
+window.addEventListener("load", ()=>{
+  loadRoster();
+  
+  // 如果名单为空但人脸库有数据，从人脸库同步名单
+  const db = JSON.parse(localStorage.getItem("faceDB") || "[]");
+  if(roster.length === 0 && db.length > 0){
+    roster = db.map(u => u.label);
+    localStorage.setItem("roster", JSON.stringify(roster));
+    buildSelect();
+  }
+  
+  loadToday();
+  refreshAttendanceUI();
+  loadModels();
+});
+</script>
+</body>
+</html>
