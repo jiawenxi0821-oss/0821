@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>八数码 A* 动态可视化</title>
+  <style>
+    :root {
+      --panel: rgba(249, 252, 255, 0.92);
+      --line: rgba(82, 133, 171, 0.2);
+      --text: #173042;
+      --muted: #587183;
+      --cyan: #2f95d6;
+      --mint: #2fb881;
+      --gold: #d39c27;
+      --rose: #de6262;
+      --indigo: #6877f1;
+      --shadow: 0 12px 28px rgba(37, 70, 94, 0.12);
+      --sans: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --mono: "Cascadia Code", "Consolas", monospace;
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    html, body {
+      min-height: 100vh;
+      font-family: var(--sans);
+      color: var(--text);
+      background: linear-gradient(135deg, #e8f4fc 0%, #f5faff 50%, #e3f0f9 100%);
+    }
+    
+    /* 网格背景 */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: 
+        linear-gradient(90deg, rgba(47, 149, 214, 0.04) 1px, transparent 1px),
+        linear-gradient(rgba(104, 119, 241, 0.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+    }
+    
+    /* 主容器 */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    
+    /* 页头 */
+    .header {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 28px 32px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    
+    .header-left h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, var(--cyan), var(--indigo));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .header-left .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    
+    .header-left .subtitle code {
+      background: rgba(47, 149, 214, 0.12);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      color: var(--cyan);
+    }
+    
+    .tags {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    
+    .tag {
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    
+    .tag.cyan { background: rgba(47, 149, 214, 0.15); color: #1a6ca3; }
+    .tag.mint { background: rgba(47, 184, 129, 0.15); color: #1a7a54; }
+    .tag.gold { background: rgba(211, 156, 39, 0.15); color: #8a5c0a; }
+    .tag.indigo { background: rgba(104, 119, 241, 0.15); color: #4a5ad9; }
+    
+    /* 主布局 */
+    .main-layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    
+    /* 控制面板 */
+    .controls {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: 24px;
+    }
+    
+    .controls h2 {
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+    
+    .controls .desc {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    
+    .form-group {
+      margin-bottom: 18px;
+    }
+    
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      color: #3a5566;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+    
+    .form-group input[type="text"] {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid rgba(82, 133, 171, 0.25);
+      border-radius: 10px;
+      font-size: 15px;
+      font-family: var(--mono);
+      background: #fff;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    
+    .form-group input[type="text"]:focus {
+      outline: none;
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 3px rgba(47, 149, 214, 0.15);
+    }
+    
+    .speed-control {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .speed-control input[type="range"] {
+      flex: 1;
+      height: 6px;
+      -webkit-appearance: none;
+      background: linear-gradient(90deg, var(--cyan), var(--mint));
+      border-radius: 3px;
+    }
+    
+    .speed-control input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      background: #fff;
+      border: 2px solid var(--cyan);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+    
+    .speed-control output {
+      min-width: 60px;
+      text-align: right;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--gold);
+    }
+    
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    
+    button {
+      padding: 12px 16px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.15s, filter 0.15s, box-shadow 0.15s;
+      font-family: inherit;
+    }
+    
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+    }
+    
+    button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .btn-primary { background: linear-gradient(135deg, #2f95d6, #4db3f0); color: #fff; }
+    .btn-success { background: linear-gradient(135deg, #2fb881, #4dd9a4); color: #fff; }
+    .btn-warning { background: linear-gradient(135deg, #d39c27, #f0b840); color: #fff; }
+    .btn-ghost { background: rgba(255,255,255,0.9); border: 1px solid var(--line); color: var(--text); }
+    
+    .error-box {
+      display: none;
+      padding: 12px 14px;
+      background: rgba(222, 98, 98, 0.12);
+      border: 1px solid rgba(222, 98, 98, 0.3);
+      border-radius: 10px;
+      color: #8c3131;
+      font-size: 13px;
+      margin-top: 16px;
+    }
+    
+    .tips {
+      margin-top: 20px;
+      padding: 16px;
+      background: rgba(47, 149, 214, 0.06);
+      border-radius: 10px;
+    }
+    
+    .tips h3 {
+      font-size: 13px;
+      color: var(--cyan);
+      margin-bottom: 10px;
+    }
+    
+    .tips ul {
+      padding-left: 18px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    
+    /* 主内容区 */
+    .content {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    
+    /* 指标卡片 */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    
+    .metric-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px 20px;
+      box-shadow: 0 4px 12px rgba(37, 70, 94, 0.08);
+    }
+    
+    .metric-card .label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    
+    .metric-card .value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+      font-family: var(--mono);
+    }
+    
+    .metric-card .hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    
+    /* 面板通用 */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+    }
+    
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    
+    .panel-header h2 {
+      font-size: 17px;
+      margin-bottom: 4px;
+    }
+    
+    .panel-header p {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    
+    .legend {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    
+    .legend-dot.mint { background: var(--mint); box-shadow: 0 0 8px var(--mint); }
+    .legend-dot.gold { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+    
+    /* 棋盘区域 */
+    .boards-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      aspect-ratio: 1;
+    }
+    
+    .tile {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      font-weight: 700;
+      font-family: var(--mono);
+      color: var(--text);
+      background: linear-gradient(180deg, #fff, #f8fbff);
+      border: 1px solid rgba(82, 133, 171, 0.2);
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .tile.blank {
+      background: linear-gradient(180deg, #d4f5d0, #b8edb4);
+      color: #1e6d34;
+      border-color: rgba(47, 184, 129, 0.3);
+    }
+    
+    .tile.movable {
+      background: linear-gradient(180deg, #fff3da, #ffe4b0);
+      border-color: rgba(211, 156, 39, 0.3);
+    }
+    
+    .mini-board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      aspect-ratio: 1;
+    }
+    
+    .mini-board .tile {
+      font-size: 32px;
+      font-weight: 700;
+      border-radius: 12px;
+    }
+    
+    .side-info {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    
+    .side-info h3 {
+      font-size: 14px;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+    
+    .info-box {
+      padding: 14px;
+      background: rgba(255,255,255,0.8);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    
+    /* 邻居和队列网格 */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+    
+    .state-card {
+      padding: 16px;
+      background: rgba(255,255,255,0.85);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      transition: transform 0.2s;
+    }
+    
+    .state-card:hover {
+      transform: translateY(-2px);
+    }
+    
+    .state-card h4 {
+      font-size: 14px;
+      font-family: var(--mono);
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+    
+    .state-card .card-board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+    
+    .state-card .card-board .tile {
+      font-size: 14px;
+      min-height: 36px;
+      border-radius: 6px;
+    }
+    
+    .state-card .meta {
+      font-size: 12px;
+      font-family: var(--mono);
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    
+    .state-card.push { border-color: rgba(47, 184, 129, 0.35); background: rgba(231, 255, 245, 0.9); }
+    .state-card.improve { border-color: rgba(47, 149, 214, 0.35); background: rgba(237, 249, 255, 0.9); }
+    .state-card.skip, .state-card.closed { border-color: rgba(222, 98, 98, 0.25); background: rgba(255, 243, 243, 0.9); }
+    .state-card.goal { border-color: rgba(211, 156, 39, 0.35); background: rgba(255, 248, 226, 0.95); }
+    
+    /* 双列布局 */
+    .two-column {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    
+    /* 路径展示 */
+    .path-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+    }
+    
+    /* 状态显示 */
+    .status-box {
+      padding: 16px 18px;
+      background: rgba(255,255,255,0.85);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text);
+      min-height: 100px;
+    }
+    
+    .route-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    
+    .route-box {
+      padding: 12px 14px;
+      background: rgba(255,255,255,0.8);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    
+    .route-box label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    
+    .route-box .value {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--text);
+      word-break: break-all;
+    }
+    
+    /* 日志区域 */
+    pre {
+      margin: 0;
+      padding: 18px;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    /* 响应式布局 */
+    @media (max-width: 1200px) {
+      .main-layout {
+        grid-template-columns: 1fr;
+      }
+      
+      .controls {
+        position: static;
+      }
+      
+      .two-column {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .container {
+        padding: 16px;
+      }
+      
+      .header {
+        padding: 20px;
+      }
+      
+      .header-left h1 {
+        font-size: 22px;
+      }
+      
+      .metrics-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      
+      .card-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .boards-section {
+        grid-template-columns: 1fr;
+      }
+      
+      .board {
+        max-width: 100%;
+      }
+      
+      .route-info {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .btn-grid, .btns {
+        grid-template-columns: 1fr;
+      }
+      
+      .metrics-grid, .metrics {
+        grid-template-columns: 1fr;
+      }
+      
+      .path-grid, .path-strip {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    
+    /* 兼容旧类名 */
+    .shell { max-width: 1400px; margin: 0 auto; padding: 24px; }
+    .top { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 28px 32px; margin-bottom: 24px; box-shadow: var(--shadow); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }
+    .eyebrow { font-size: 12px; color: var(--cyan); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; }
+    .lead { color: var(--muted); font-size: 14px; line-height: 1.6; margin-top: 8px; }
+    .lead code { background: rgba(47, 149, 214, 0.12); padding: 2px 8px; border-radius: 4px; font-family: var(--mono); color: var(--cyan); }
+    .chips { display: flex; gap: 10px; flex-wrap: wrap; }
+    .chips span { padding: 8px 16px; border-radius: 20px; font-size: 13px; background: rgba(47, 149, 214, 0.12); color: #1a6ca3; }
+    .layout { display: grid; grid-template-columns: 340px 1fr; gap: 24px; align-items: start; }
+    .copy { color: var(--muted); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+    .row { margin-bottom: 18px; }
+    .row label { display: block; font-size: 13px; color: #3a5566; margin-bottom: 8px; font-weight: 500; }
+    .speed { display: flex; align-items: center; gap: 12px; }
+    .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    button.alt { background: linear-gradient(135deg, #2fb881, #4dd9a4); color: #fff; }
+    button.warn { background: linear-gradient(135deg, #d39c27, #f0b840); color: #fff; }
+    button.ghost { background: rgba(255,255,255,0.9); border: 1px solid var(--line); color: var(--text); }
+    .error { display: none; padding: 12px 14px; background: rgba(222, 98, 98, 0.12); border: 1px solid rgba(222, 98, 98, 0.3); border-radius: 10px; color: #8c3131; font-size: 13px; margin-top: 12px; }
+    .main { display: flex; flex-direction: column; gap: 24px; }
+    .box { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); }
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .metric { background: rgba(255,255,255,0.7); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+    .metric small { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .metric strong { display: block; font-size: 22px; font-weight: 700; color: var(--text); font-family: var(--mono); }
+    .metric span { display: block; font-size: 11px; color: var(--muted); margin-top: 6px; }
+    .hero { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .panel-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+    .panel-head h2 { font-size: 17px; margin-bottom: 4px; }
+    .panel-head p { font-size: 13px; color: var(--muted); margin: 0; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+    .boards { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+    .board-col { display: flex; flex-direction: column; gap: 10px; }
+    .board-label { font-size: 15px; font-weight: 600; color: #21485d; line-height: 1.2; min-height: 18px; }
+    .stack { display: flex; flex-direction: column; gap: 14px; align-self: stretch; }
+    .stack h2 { font-size: 14px; margin: 0 0 10px; }
+    .mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; aspect-ratio: 1; }
+    .mini .tile { font-size: 32px; font-weight: 700; border-radius: 12px; }
+    .note { padding: 12px 14px; background: rgba(255,255,255,0.8); border: 1px solid var(--line); border-radius: 10px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .neighbors, .frontier { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+    .path-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+    .card { padding: 14px; background: rgba(255,255,255,0.85); border: 1px solid var(--line); border-radius: 12px; }
+    .card h3 { font-size: 14px; font-family: var(--mono); margin: 0 0 10px; color: var(--text); }
+    .card-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 8px; }
+    .card-board .tile { font-size: 14px; min-height: 36px; border-radius: 6px; }
+    .card .meta { font-size: 12px; font-family: var(--mono); color: var(--muted); line-height: 1.6; }
+    .card.push { border-color: rgba(47, 184, 129, 0.35); background: rgba(231, 255, 245, 0.9); }
+    .card.improve { border-color: rgba(47, 149, 214, 0.35); background: rgba(237, 249, 255, 0.9); }
+    .card.skip, .card.closed { border-color: rgba(222, 98, 98, 0.25); background: rgba(255, 243, 243, 0.9); }
+    .card.goal { border-color: rgba(211, 156, 39, 0.35); background: rgba(255, 248, 226, 0.95); }
+    .status { padding: 14px 16px; background: rgba(255,255,255,0.85); border: 1px solid var(--line); border-radius: 12px; font-size: 14px; line-height: 1.6; color: var(--text); min-height: 80px; }
+    .route { padding: 10px 12px; background: rgba(255,255,255,0.8); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; }
+    .route label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .route div { font-family: var(--mono); font-size: 13px; color: var(--text); word-break: break-all; }
+    .lower { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    
+    /* JS 动态生成的类 */
+    .state-card { padding: 14px; background: rgba(255,255,255,0.85); border: 1px solid var(--line); border-radius: 12px; }
+    .state-card h4 { font-size: 14px; font-family: var(--mono); margin: 0 0 10px; color: var(--text); }
+    .state-card.push { border-color: rgba(47, 184, 129, 0.35); background: rgba(231, 255, 245, 0.9); }
+    .state-card.improve { border-color: rgba(47, 149, 214, 0.35); background: rgba(237, 249, 255, 0.9); }
+    .state-card.skip, .state-card.closed { border-color: rgba(222, 98, 98, 0.25); background: rgba(255, 243, 243, 0.9); }
+    .state-card.goal { border-color: rgba(211, 156, 39, 0.35); background: rgba(255, 248, 226, 0.95); }
+    .info-box { padding: 12px 14px; background: rgba(255,255,255,0.8); border: 1px solid var(--line); border-radius: 10px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+    
+    @media (max-width: 1200px) {
+      .layout, .hero, .lower { grid-template-columns: 1fr; }
+      .controls { position: static; }
+    }
+    @media (max-width: 768px) {
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .boards { grid-template-columns: 1fr; }
+      .neighbors, .frontier { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="top">
+      <div>
+        <p class="eyebrow">A* Eight Puzzle Lab</p>
+        <h1>八数码 A* 动态可视化</h1>
+        <p class="lead">目标状态固定为 <code>123804765</code>。页面会动态展示 A* 的扩展过程，并同步给出 open 队列、候选邻居与最终最优路径回放。</p>
+      </div>
+      <div class="chips"><span>A* 搜索</span><span>曼哈顿距离</span><span>最优路径</span><span>动态日志</span></div>
+    </header>
+
+    <div class="layout">
+      <aside class="controls">
+        <div>
+          <h2>输入与控制</h2>
+          <p class="copy">输入 9 位数字串，0 表示空格。可以直接载入样例，也可以随机生成一个可达状态。</p>
+        </div>
+        <div class="row">
+          <label for="stateInput">初始状态</label>
+          <input id="stateInput" type="text" value="283104765" maxlength="9" spellcheck="false" />
+        </div>
+        <div class="row">
+          <label for="speedInput">自动播放速度</label>
+          <div class="speed">
+            <input id="speedInput" type="range" min="80" max="1200" step="20" value="260" />
+            <output id="speedOut">260 ms</output>
+          </div>
+        </div>
+        <div class="btns">
+          <button id="sampleBtn" class="alt">载入样例</button>
+          <button id="goalBtn" class="alt">载入目标</button>
+          <button id="randomBtn">随机可达</button>
+          <button id="solveBtn" class="warn">运行 A*</button>
+        </div>
+        <div class="btns">
+          <button id="nextBtn" disabled>下一步</button>
+          <button id="autoBtn" disabled>自动播放</button>
+          <button id="restartBtn" class="ghost" disabled>重新开始</button>
+          <button id="exportBtn" class="ghost" disabled>导出结果</button>
+        </div>
+        <div id="errorBox" class="error"></div>
+        <ul class="tips">
+          <li>启发函数使用曼哈顿距离。</li>
+          <li>A* 每次优先扩展 <code>f=g+h</code> 最小的状态。</li>
+          <li>若奇偶性不同，则无法到达目标状态，页面会提示。</li>
+        </ul>
+      </aside>
+
+      <main class="main">
+        <section class="box">
+          <div class="metrics">
+            <div class="metric"><small>播放步骤</small><strong id="mStep">0 / 0</strong><span>事件回放进度</span></div>
+            <div class="metric"><small>当前 f</small><strong id="mF">--</strong><span>估计总代价</span></div>
+            <div class="metric"><small>当前 g / h</small><strong id="mGH">-- / --</strong><span>已走步数 / 启发值</span></div>
+            <div class="metric"><small>Open / Closed</small><strong id="mOC">0 / 0</strong><span>待扩展 / 已扩展</span></div>
+            <div class="metric"><small>最优步数</small><strong id="mAnswer">--</strong><span id="mPathText">等待求解</span></div>
+            <div class="metric"><small>当前状态串</small><strong id="mState">283104765</strong><span>当前播放状态</span></div>
+          </div>
+        </section>
+
+        <section class="hero">
+          <section class="panel">
+            <div class="panel-head">
+              <div><h2>当前展开状态</h2><p>绿色是空格，橙色是下一步可移动到空格的位置。</p></div>
+              <div class="legend">
+                <span><i class="dot" style="color:var(--mint);background:var(--mint)"></i>空格</span>
+                <span><i class="dot" style="color:var(--gold);background:var(--gold)"></i>可移动棋子</span>
+              </div>
+            </div>
+            <div class="boards">
+              <div class="board-col">
+                <div class="board-label">当前状态</div>
+                <div id="currentBoard" class="board"></div>
+              </div>
+              <div class="board-col">
+                <div class="board-label">目标状态</div>
+                <div id="goalBoard" class="mini"></div>
+                <div id="goalMeta" class="note" style="margin-top:8px;">目标：123804765</div>
+              </div>
+            </div>
+            <div id="boardNote" class="note" style="margin-top:14px;">等待求解。点击“运行 A*”开始。</div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div><h2>候选邻居</h2><p>显示当前状态扩展出的相邻状态，以及它们被加入、改进还是跳过。</p></div>
+            </div>
+            <div id="neighborGrid" class="neighbors"></div>
+          </section>
+        </section>
+
+        <section class="hero">
+          <section class="panel">
+            <div class="panel-head">
+              <div><h2>Open 队列前几项</h2><p>A* 会优先从这些状态中选择 <code>f</code> 最小者继续搜索。</p></div>
+            </div>
+            <div id="frontierGrid" class="frontier"></div>
+            <div id="frontierNote" class="note" style="margin-top:12px;">等待求解。</div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div><h2>最优路径回放</h2><p>目标找到后，会按状态序列展示从初始状态到目标状态的最短路径。</p></div>
+            </div>
+            <div id="pathStrip" class="path-strip"></div>
+            <div id="pathNote" class="note" style="margin-top:12px;">目标尚未找到，等待搜索完成。</div>
+          </section>
+        </section>
+
+        <section class="lower">
+          <section class="panel">
+            <h2>本步状态</h2>
+            <div id="statusLine" class="status">等待求解。</div>
+            <div class="stack" style="margin-top:12px;">
+              <div class="route"><label>当前状态串</label><div id="stateLine">283104765</div></div>
+              <div class="route"><label>当前搜索路径</label><div id="routeLine">[]</div></div>
+            </div>
+            <h2 style="margin-top:16px;">文本结果</h2>
+            <pre id="resultOut" style="min-height:220px;max-height:320px;">运行完成后，这里会给出最短步数和最优路径。</pre>
+          </section>
+
+          <section class="panel">
+            <h2>搜索日志</h2>
+            <pre id="logOut">[搜索日志]
+等待求解...</pre>
+          </section>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+const GOAL="123804765",MOVE_MAP=[[1,3],[0,2,4],[1,5],[0,4,6],[1,3,5,7],[2,4,8],[3,7],[4,6,8],[5,7]];
+const GOAL_POS=((g)=>{const o={};[...g].forEach((ch,i)=>o[ch]=i);return o;})(GOAL);
+const U={state:gid("stateInput"),speed:gid("speedInput"),speedOut:gid("speedOut"),sample:gid("sampleBtn"),goal:gid("goalBtn"),random:gid("randomBtn"),solve:gid("solveBtn"),next:gid("nextBtn"),auto:gid("autoBtn"),restart:gid("restartBtn"),export:gid("exportBtn"),error:gid("errorBox"),currentBoard:gid("currentBoard"),goalBoard:gid("goalBoard"),goalMeta:gid("goalMeta"),boardNote:gid("boardNote"),neighborGrid:gid("neighborGrid"),frontierGrid:gid("frontierGrid"),frontierNote:gid("frontierNote"),pathStrip:gid("pathStrip"),pathNote:gid("pathNote"),status:gid("statusLine"),stateLine:gid("stateLine"),routeLine:gid("routeLine"),result:gid("resultOut"),log:gid("logOut"),mStep:gid("mStep"),mF:gid("mF"),mGH:gid("mGH"),mOC:gid("mOC"),mAnswer:gid("mAnswer"),mPathText:gid("mPathText"),mState:gid("mState")};
+const A={data:null,pb:null,timer:null};
+function gid(id){return document.getElementById(id)}
+function showError(msg){U.error.style.display="block";U.error.textContent=msg}
+function clearError(){U.error.style.display="none";U.error.textContent=""}
+function syncSpeed(){U.speedOut.textContent=`${U.speed.value} ms`}
+function parseState(raw){const s=String(raw||"").trim();if(!/^\d{9}$/.test(s))throw new Error("初始状态必须是 9 位数字串，例如 283104765。");const set=new Set([...s]);if(set.size!==9||[...set].some(ch=>ch<"0"||ch>"8"))throw new Error("状态串必须恰好包含 0 到 8 各一次。");return s}
+function parseSafe(raw){try{return parseState(raw)}catch{return null}}
+function inversions(state){const arr=[...state].filter(ch=>ch!=="0").map(Number);let cnt=0;for(let i=0;i<arr.length;i++)for(let j=i+1;j<arr.length;j++)if(arr[i]>arr[j])cnt++;return cnt%2}
+function solvable(state){return inversions(state)===inversions(GOAL)}
+function manhattan(state){let d=0;for(let i=0;i<state.length;i++){const ch=state[i];if(ch==="0")continue;const t=GOAL_POS[ch];d+=Math.abs((i/3|0)-(t/3|0))+Math.abs(i%3-t%3)}return d}
+function reconstruct(parents,state){const out=[];let cur=state;while(cur!=null){out.push(cur);cur=parents.get(cur)??null}return out.reverse()}
+function movesOf(state,g){const z=state.indexOf("0");return MOVE_MAP[z].map(pos=>{const chars=[...state],tile=chars[pos];[chars[z],chars[pos]]=[chars[pos],chars[z]];const next=chars.join(""),h=manhattan(next);return{state:next,movedTile:Number(tile),g:g+1,h,f:g+1+h,status:"pending"}})}
+class MinHeap{constructor(cmp){this.cmp=cmp;this.items=[]}size(){return this.items.length}push(x){this.items.push(x);this.up(this.items.length-1)}pop(){if(!this.items.length)return null;const top=this.items[0],last=this.items.pop();if(this.items.length){this.items[0]=last;this.down(0)}return top}up(i){while(i>0){const p=(i-1>>1);if(this.cmp(this.items[p],this.items[i])<=0)break;[this.items[p],this.items[i]]=[this.items[i],this.items[p]];i=p}}down(i){for(;;){let b=i,l=i*2+1,r=i*2+2;if(l<this.items.length&&this.cmp(this.items[b],this.items[l])>0)b=l;if(r<this.items.length&&this.cmp(this.items[b],this.items[r])>0)b=r;if(b===i)break;[this.items[b],this.items[i]]=[this.items[i],this.items[b]];i=b}}}
+function frontier(heap,bestG,closed,limit=6){const map=new Map();for(const item of heap.items){if(closed.has(item.state))continue;if(bestG.get(item.state)!==item.g)continue;const prev=map.get(item.state);if(!prev||item.f<prev.f||(item.f===prev.f&&item.h<prev.h))map.set(item.state,{state:item.state,g:item.g,h:item.h,f:item.f})}const arr=[...map.values()].sort((a,b)=>a.f-b.f||a.h-b.h||a.g-b.g||a.state.localeCompare(b.state));return{count:arr.length,items:arr.slice(0,limit)}}
+function solveAStar(start){if(!solvable(start))throw new Error("该初始状态无法到达目标状态 123804765。请更换输入。");const heap=new MinHeap((a,b)=>a.f-b.f||a.h-b.h||a.g-b.g||a.state.localeCompare(b.state));const bestG=new Map([[start,0]]),parents=new Map([[start,null]]),closed=new Set(),events=[];const push=(type,payload)=>events.push({type,index:events.length+1,...payload});const h0=manhattan(start);heap.push({state:start,g:0,h:h0,f:h0});push("start",{state:start,g:0,h:h0,f:h0,closedCount:0,frontier:frontier(heap,bestG,closed),neighbors:[],currentPath:[start],message:`初始状态 ${start} 进入 open 队列。`});
+while(heap.size()){const cur=heap.pop();if(!cur)break;if(closed.has(cur.state)||bestG.get(cur.state)!==cur.g)continue;closed.add(cur.state);const path=reconstruct(parents,cur.state);let neighbors=movesOf(cur.state,cur.g);push("expand",{state:cur.state,g:cur.g,h:cur.h,f:cur.f,closedCount:closed.size,frontier:frontier(heap,bestG,closed),neighbors:neighbors.map(x=>({...x})),currentPath:path,message:`从 open 队列中取出 f 最小状态 ${cur.state} 进行扩展。`});if(cur.state===GOAL){push("goal",{state:cur.state,g:cur.g,h:cur.h,f:cur.f,closedCount:closed.size,frontier:frontier(heap,bestG,closed),neighbors:[],currentPath:path,solutionPath:path,message:`目标状态 ${GOAL} 已被取出，A* 搜索完成，最短步数为 ${path.length-1}。`});return{start,goal:GOAL,answer:path.length-1,solutionPath:path,events}}for(let i=0;i<neighbors.length;i++){const next=neighbors[i];let status="skip",msg="";if(closed.has(next.state)){status="closed";msg=`邻居 ${next.state} 已在 closed 集中，跳过。`;}else{const known=bestG.get(next.state);if(known==null){bestG.set(next.state,next.g);parents.set(next.state,cur.state);heap.push(next);status=next.state===GOAL?"goal":"push";msg=`发现新状态 ${next.state}，移动棋子 ${next.movedTile}，入队，f=${next.f}。`;}else if(next.g<known){bestG.set(next.state,next.g);parents.set(next.state,cur.state);heap.push(next);status="improve";msg=`状态 ${next.state} 找到更优路径，g 从 ${known} 改进到 ${next.g}。`;}else msg=`状态 ${next.state} 已有更优或等优路径，跳过。`;}neighbors=neighbors.map((x,idx)=>idx===i?{...x,status}:x);push("neighbor",{state:cur.state,g:cur.g,h:cur.h,f:cur.f,closedCount:closed.size,frontier:frontier(heap,bestG,closed),neighbors:neighbors.map(x=>({...x})),currentPath:path,message:msg})}}throw new Error("搜索未找到目标状态。")}
+function randReachable(steps=20){let state=GOAL,last=null;for(let i=0;i<steps;i++){const z=state.indexOf("0"),ops=MOVE_MAP[z].filter(x=>x!==last),pick=ops[Math.floor(Math.random()*ops.length)],chars=[...state];[chars[z],chars[pick]]=[chars[pick],chars[z]];last=z;state=chars.join("")}return state}
+function boardHTML(state){const z=state.indexOf("0"),mov=new Set(MOVE_MAP[z]);return[...state].map((ch,i)=>`<div class="tile ${ch==="0"?"blank":mov.has(i)?"movable":""}">${ch}</div>`).join("")}
+function statusText(s){return({pending:"等待处理",push:"新状态入队",improve:"找到更优路径",skip:"已有更优路径",closed:"已在 closed",goal:"目标状态"})[s]||s}
+function renderBoard(){const start=parseSafe(U.state.value)||"283104765",e=A.pb&&A.pb.current;U.currentBoard.innerHTML=boardHTML(e?e.state:start);U.goalBoard.innerHTML=boardHTML(GOAL);U.goalMeta.textContent=`目标状态：${GOAL}`;U.boardNote.textContent=e?e.message:"等待求解。点击“运行 A*”开始。"}
+function renderNeighbors(){const e=A.pb&&A.pb.current;if(!e||!e.neighbors.length){U.neighborGrid.innerHTML=`<div class="state-card"><h4>等待扩展</h4><div class="info-box">当前还没有邻居状态可以展示。</div></div>`;return}U.neighborGrid.innerHTML=e.neighbors.map(x=>`<div class="state-card ${x.status}"><h4>${x.state}</h4><div class="card-board">${boardHTML(x.state)}</div><div class="meta">g=${x.g}  h=${x.h}  f=${x.f}<br>状态：${statusText(x.status)}</div></div>`).join("")}
+function renderFrontier(){const e=A.pb&&A.pb.current;if(!e){U.frontierGrid.innerHTML="";U.frontierNote.textContent="等待求解。";return}const items=e.frontier.items||[];U.frontierGrid.innerHTML=items.map((x,i)=>`<div class="state-card"><h4>#${i+1} ${x.state}</h4><div class="card-board">${boardHTML(x.state)}</div><div class="meta">g=${x.g}  h=${x.h}  f=${x.f}</div></div>`).join("");U.frontierNote.textContent=items.length?`当前 open 队列中共有 ${e.frontier.count} 个有效状态，页面展示最靠前的 ${items.length} 个。`:"当前 open 队列为空。"}
+function renderPath(){if(!(A.pb&&A.pb.goalSeen&&A.data)){U.pathStrip.innerHTML="";U.pathNote.textContent="目标尚未找到，等待搜索完成。";return}U.pathStrip.innerHTML=A.data.solutionPath.map((s,i)=>`<div class="state-card"><h4>Step ${i}</h4><div class="card-board">${boardHTML(s)}</div><div class="meta">${s}</div></div>`).join("");U.pathNote.textContent=`最优路径共 ${A.data.answer} 步，状态序列已完整展示。`}
+function renderMetrics(){const e=A.pb&&A.pb.current;if(!e||!A.data){U.mStep.textContent="0 / 0";U.mF.textContent="--";U.mGH.textContent="-- / --";U.mOC.textContent="0 / 0";U.mAnswer.textContent="--";U.mPathText.textContent="等待求解";U.mState.textContent=parseSafe(U.state.value)||"283104765";return}U.mStep.textContent=`${A.pb.idx} / ${A.data.events.length}`;U.mF.textContent=String(e.f??"--");U.mGH.textContent=`${e.g??"--"} / ${e.h??"--"}`;U.mOC.textContent=`${e.frontier.count??0} / ${e.closedCount??0}`;U.mAnswer.textContent=A.pb.goalSeen?String(A.data.answer):"--";U.mPathText.textContent=A.pb.goalSeen?`${A.data.solutionPath.length} 个状态`:"目标未找到";U.mState.textContent=e.state}
+function renderText(){const e=A.pb&&A.pb.current;if(!e||!A.data){U.status.textContent="等待求解。";U.stateLine.textContent=parseSafe(U.state.value)||"283104765";U.routeLine.textContent="[]";U.result.textContent="运行完成后，这里会给出最短步数和最优路径。";U.log.textContent="[搜索日志]\n等待求解...";return}U.status.textContent=e.message;U.stateLine.textContent=e.state;U.routeLine.textContent=`[${e.currentPath.join(" -> ")}]`;U.result.textContent=[`初始状态: ${A.data.start}`,`目标状态: ${A.data.goal}`,`已播放事件: ${A.pb.idx} / ${A.data.events.length}`,`当前状态: ${e.state}`,`当前 g/h/f: ${e.g} / ${e.h} / ${e.f}`,`Open / Closed: ${e.frontier.count} / ${e.closedCount}`,"",A.pb.goalSeen?`最短步数: ${A.data.answer}\n最优路径: ${A.data.solutionPath.join(" -> ")}`:"目标尚未找到。"].join("\n");U.log.textContent=A.pb.logs.join("\n")}
+function buttons(){const ok=!!(A.data&&A.pb),done=ok?A.pb.idx>=A.data.events.length:true;U.next.disabled=!ok||done;U.auto.disabled=!ok||done;U.restart.disabled=!ok;U.export.disabled=!ok}
+function renderAll(){renderBoard();renderNeighbors();renderFrontier();renderPath();renderMetrics();renderText();buttons()}
+function newPb(){return{idx:0,current:null,goalSeen:false,logs:["[搜索日志]","初始化完成，准备按事件序列回放 A* 搜索。"]}}
+function applyEvent(e){A.pb.current=e;if(e.type==="goal")A.pb.goalSeen=true;A.pb.logs.push(`Step ${A.pb.idx+1}: ${e.message}`);if(A.pb.logs.length>52)A.pb.logs.splice(1,A.pb.logs.length-52)}
+function stepOnce(){if(!A.data||!A.pb)return false;if(A.pb.idx>=A.data.events.length){stopAuto();buttons();return false}const e=A.data.events[A.pb.idx];applyEvent(e);A.pb.idx++;renderAll();if(A.pb.idx>=A.data.events.length)stopAuto();return true}
+function stopAuto(){if(A.timer){clearInterval(A.timer);A.timer=null}U.auto.textContent="自动播放"}
+function toggleAuto(){if(!A.data||!A.pb)return;if(A.timer){stopAuto();return}U.auto.textContent="暂停播放";A.timer=setInterval(()=>{const ok=stepOnce();if(!ok)stopAuto()},Number(U.speed.value))}
+function restart(){if(!A.data)return;stopAuto();A.pb=newPb();renderAll();stepOnce()}
+function runSolve(){try{clearError();stopAuto();const start=parseState(U.state.value);U.state.value=start;A.data=solveAStar(start);A.pb=newPb();renderAll();stepOnce()}catch(err){showError(err instanceof Error?err.message:String(err))}}
+function exportResult(){if(!A.data)return;const txt=["八数码 A* 实验导出",`初始状态: ${A.data.start}`,`目标状态: ${A.data.goal}`,`最短步数: ${A.data.answer}`,`路径长度: ${A.data.solutionPath.length} 个状态`,`最优路径: ${A.data.solutionPath.join(" -> ")}`].join("\n");const blob=new Blob([txt],{type:"text/plain;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="eight_puzzle_astar_result.txt";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(a.href)}
+U.speed.addEventListener("input",()=>{syncSpeed();if(A.timer){stopAuto();toggleAuto()}});
+U.sample.addEventListener("click",()=>{U.state.value="283104765";clearError();renderAll()});U.goal.addEventListener("click",()=>{U.state.value=GOAL;clearError();renderAll()});U.random.addEventListener("click",()=>{U.state.value=randReachable(20+Math.floor(Math.random()*16));clearError();renderAll()});
+U.solve.addEventListener("click",runSolve);U.next.addEventListener("click",stepOnce);U.auto.addEventListener("click",toggleAuto);U.restart.addEventListener("click",restart);U.export.addEventListener("click",exportResult);
+syncSpeed();renderAll();
+  </script>
+</body>
+</html>
