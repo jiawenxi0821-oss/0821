@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>八皇后回溯法动态可视化</title>
+  <style>
+    :root{
+      --bg:#eef6ff;--panel:rgba(247,251,255,.84);--line:rgba(77,135,168,.22);--text:#142634;--muted:#557082;
+      --cyan:#2497d8;--mint:#28b67e;--gold:#d79b1f;--rose:#d85a5f;--indigo:#5a6cf0;
+      --mono:"Cascadia Code","Consolas",monospace;--sans:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+      --shadow:0 16px 34px rgba(39,70,96,.14);
+    }
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%}
+    body{
+      min-height:100vh;color:var(--text);font-family:var(--sans);
+      background:
+        linear-gradient(180deg,rgba(239,246,255,.88),rgba(230,241,252,.92)),
+        url("assets/eight-queens-bg.png") center/cover no-repeat fixed;
+    }
+    body::before{
+      content:"";position:fixed;inset:0;pointer-events:none;
+      background:
+        linear-gradient(90deg,rgba(36,151,216,.08) 1px,transparent 1px),
+        linear-gradient(rgba(90,108,240,.06) 1px,transparent 1px);
+      background-size:42px 42px,42px 42px;mask-image:linear-gradient(180deg,#000,transparent);
+    }
+    .shell{max-width:1560px;margin:0 auto;padding:18px;display:grid;gap:16px}
+    .top,.panel,.stage,.panel2{border:1px solid var(--line);border-radius:8px;background:var(--panel);box-shadow:var(--shadow);backdrop-filter:blur(12px)}
+    .top{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;padding:20px}
+    .eyebrow{margin:0 0 6px;color:var(--cyan);font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+    h1{margin:0;font-size:30px;line-height:1.15}
+    .lead{margin:10px 0 0;max-width:780px;color:var(--muted);font-size:14px;line-height:1.58}
+    .chips{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+    .chips span{border:1px solid rgba(215,155,31,.26);border-radius:999px;padding:6px 12px;background:rgba(255,226,156,.42);color:#7b5911;font-size:12px}
+    .layout{display:grid;grid-template-columns:410px minmax(0,1fr);gap:18px;align-items:start}
+    .panel{padding:20px;display:grid;gap:16px;position:sticky;top:18px}
+    .panel h2,.stage h2{margin:0 0 8px;font-size:17px}
+    .copy,.foot{margin:0;color:var(--muted);font-size:13px;line-height:1.52}
+    .row,.btns{display:grid;gap:10px}.row.two,.btns{grid-template-columns:repeat(2,minmax(0,1fr))}
+    label{font-size:13px;color:#315264}
+    input,button{font-family:inherit}
+    input[type="number"],input[type="file"]{
+      width:100%;border:1px solid rgba(77,135,168,.28);border-radius:8px;background:rgba(255,255,255,.9);color:var(--text);font-size:14px;padding:11px 12px;
+    }
+    input[type="range"]{width:100%}
+    button{
+      border:1px solid transparent;border-radius:8px;padding:10px 12px;font-size:14px;color:#f9fffe;cursor:pointer;
+      background:linear-gradient(135deg,#0c8f9f,#1ca5d8);transition:transform .15s ease,filter .15s ease;
+    }
+    button:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.08)}
+    button.alt{background:linear-gradient(135deg,#2f8d5f,#25c58b)}
+    button.warn{background:linear-gradient(135deg,#c68a1e,#f0b647);color:#2a1e07}
+    button.ghost{background:rgba(255,255,255,.78);border-color:rgba(77,135,168,.26);color:#21485e}
+    button:disabled{background:rgba(196,208,218,.92);color:rgba(20,38,52,.58);cursor:not-allowed;filter:none;transform:none}
+    .speed{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px}
+    .speed output{min-width:64px;text-align:right;color:#8b6214;font-family:var(--mono);font-size:13px}
+    .error{display:none;border:1px solid rgba(216,90,95,.35);border-radius:8px;padding:10px 12px;background:rgba(255,123,114,.14);color:#8a2b32;font-size:13px;white-space:pre-wrap}
+    .tips{margin:0;padding-left:18px;color:var(--muted);font-size:12px;line-height:1.6}
+    .main{display:grid;gap:16px}
+    .metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .metric{padding:16px;border:1px solid rgba(77,135,168,.18);border-radius:8px;background:rgba(255,255,255,.68);min-height:104px}
+    .metric small{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+    .metric strong{display:block;font-size:22px;line-height:1.2;color:#14384c}
+    .metric span{display:block;margin-top:7px;color:#4f7081;font-size:12px;line-height:1.5;word-break:break-word}
+    .visuals{display:grid;grid-template-columns:minmax(0,.98fr) minmax(0,1.02fr);gap:18px}
+    .stage{overflow:hidden}
+    .stage-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 18px 12px;border-bottom:1px solid rgba(77,135,168,.14)}
+    .stage-head p{margin:4px 0 0;color:var(--muted);font-size:12px}
+    .legend{display:flex;flex-wrap:wrap;gap:10px;color:var(--muted);font-size:12px}
+    .legend span{display:inline-flex;align-items:center;gap:6px}.dot{width:10px;height:10px;border-radius:999px;box-shadow:0 0 10px currentColor}
+    .board-wrap{padding:20px}
+    .board{
+      display:grid;gap:0;border:1px solid rgba(77,135,168,.18);border-radius:8px;overflow:hidden;aspect-ratio:1/1;
+      background:rgba(234,242,250,.95);box-shadow:inset 0 0 0 1px rgba(255,255,255,.42);
+    }
+    .cell{
+      position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;
+      border:1px solid rgba(32,61,82,.16);min-height:56px;
+    }
+    .cell.light{background:rgba(247,250,255,.98)}.cell.dark{background:rgba(170,198,226,.95)}
+    .cell.active-row::after{
+      content:"";position:absolute;inset:0;background:rgba(90,108,240,.12)
+    }
+    .cell.focus-ok::after,.cell.focus-bad::after{
+      content:"";position:absolute;inset:4px;border-radius:6px;border:2px solid currentColor;box-shadow:0 0 16px currentColor;
+    }
+    .cell.focus-ok{color:var(--mint)}.cell.focus-bad{color:var(--rose)}
+    .cell img{width:72%;height:72%;object-fit:contain;filter:drop-shadow(0 0 10px rgba(0,0,0,.35));position:relative;z-index:1}
+    .cell .idx{position:absolute;left:6px;top:4px;font-size:10px;color:rgba(20,38,52,.46);font-family:var(--mono)}
+    .board-note{margin-top:14px;padding:12px 14px;border:1px solid rgba(77,135,168,.16);border-radius:8px;background:rgba(255,255,255,.78);font-size:13px;line-height:1.58;color:#29485a}
+    .tree-wrap{position:relative;height:640px;background:radial-gradient(circle at top left,rgba(99,229,255,.1),transparent 42%),radial-gradient(circle at top right,rgba(255,209,102,.09),transparent 40%),linear-gradient(180deg,rgba(11,20,30,.8),rgba(9,16,24,.9))}
+    canvas{display:block;width:100%;height:100%}
+    .tree-note{position:absolute;left:16px;bottom:14px;max-width:calc(100% - 32px);padding:9px 11px;border:1px solid rgba(77,135,168,.16);border-radius:8px;background:rgba(248,252,255,.82);font-size:12px;line-height:1.48;color:#234456}
+    .lower-grid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:18px;align-items:start}
+    .stack{display:grid;gap:18px}
+    .panel2{padding:18px}
+    .panel2 h2{margin:0 0 12px;font-size:17px}
+    .status{min-height:118px;padding:14px 16px;border:1px solid rgba(77,135,168,.14);border-radius:8px;background:rgba(255,255,255,.72);font-size:14px;line-height:1.65;color:#1b394d}
+    pre{margin:0;min-height:360px;max-height:460px;overflow:auto;border:1px solid rgba(77,135,168,.14);border-radius:8px;background:rgba(255,255,255,.8);color:#153344;font-family:var(--mono);font-size:13px;line-height:1.6;padding:16px;white-space:pre-wrap;word-break:break-word}
+    .routes{display:grid;gap:10px;margin-top:12px}
+    .route{padding:12px 14px;border:1px solid rgba(77,135,168,.14);border-radius:8px;background:rgba(255,255,255,.68)}
+    .route label{display:block;margin-bottom:6px;font-size:12px;color:var(--muted)}
+    .route div{font-family:var(--mono);font-size:13px;line-height:1.5;color:#173647}
+    .solutions{display:grid;grid-template-columns:1fr;gap:12px;max-height:460px;overflow:auto}
+    .solution{padding:12px 14px;border:1px solid rgba(77,135,168,.14);border-radius:8px;background:rgba(255,255,255,.72)}
+    .solution strong{display:block;margin-bottom:6px;font-size:13px;color:#916819}
+    .solution div{font-family:var(--mono);font-size:13px;line-height:1.55;color:#173647}
+    #logOut{min-height:760px;max-height:980px}
+    #resultOut{min-height:220px;max-height:320px}
+    @media (max-width:1260px){.layout,.visuals,.lower-grid{grid-template-columns:1fr}.panel{position:static}#logOut{min-height:360px;max-height:460px}}
+    @media (max-width:960px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.row.two,.btns{grid-template-columns:1fr}.tree-wrap{height:500px}}
+    @media (max-width:640px){.shell{padding:12px}.top{flex-direction:column;align-items:flex-start}h1{font-size:24px}.metrics{grid-template-columns:1fr}.tree-wrap{height:380px}.cell{min-height:42px}}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="top">
+      <div>
+        <p class="eyebrow">Backtracking N-Queens Lab</p>
+        <h1>八皇后回溯法动态可视化</h1>
+        <p class="lead">页面会逐步展示“尝试放置、放置成功、冲突拒绝、回溯撤销、找到解”五种关键动作。你既可以直接运行内置搜索，也可以把 Python 导出的 JSON 步骤日志载入进来播放。</p>
+      </div>
+      <div class="chips"><span>递归回溯</span><span>搜索树联动</span><span>棋盘动态更新</span><span>Python 日志兼容</span></div>
+    </header>
+
+    <div class="layout">
+      <aside class="panel">
+        <div>
+          <h2>控制台</h2>
+          <p class="copy">默认按 8 皇后运行。想做扩展实验时，也可以把棋盘改成 4 到 10 之间的任意整数。</p>
+        </div>
+        <div class="row two">
+          <div class="row">
+            <label for="sizeInput">棋盘大小</label>
+            <input id="sizeInput" type="number" min="4" max="10" value="8" />
+          </div>
+          <div class="row">
+            <label for="speedInput">自动播放速度</label>
+            <div class="speed">
+              <input id="speedInput" type="range" min="40" max="800" step="20" value="220" />
+              <output id="speedOut">220 ms</output>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <label for="fileInput">导入 Python JSON 日志</label>
+          <input id="fileInput" type="file" accept=".json,application/json" />
+        </div>
+        <div class="btns">
+          <button id="runBtn" class="alt">运行内置搜索</button>
+          <button id="loadBtn" class="warn">载入 JSON</button>
+          <button id="nextBtn" disabled>下一步</button>
+          <button id="autoBtn" disabled>自动播放</button>
+        </div>
+        <div class="btns">
+          <button id="restartBtn" class="ghost" disabled>重新开始</button>
+          <button id="exportBtn" class="ghost" disabled>导出结果</button>
+        </div>
+        <div id="errorBox" class="error"></div>
+        <ul class="tips">
+          <li>皇后互不攻击的约束包括：不同列、不同主对角线、不同副对角线。</li>
+          <li>搜索树中的一个结点表示“前若干行已经成功放置皇后”的一个部分解。</li>
+          <li>Python 脚本默认会导出 `eight_queens_steps.json`，可直接在这里导入。</li>
+        </ul>
+      </aside>
+
+      <main class="main">
+        <section class="panel2">
+          <div class="metrics">
+            <div class="metric"><small>步骤</small><strong id="mStep">0 / 0</strong><span>播放进度</span></div>
+            <div class="metric"><small>尝试次数</small><strong id="mTry">0</strong><span>所有列尝试总数</span></div>
+            <div class="metric"><small>回溯次数</small><strong id="mBack">0</strong><span>撤销放置次数</span></div>
+            <div class="metric"><small>已找到解</small><strong id="mSol">0</strong><span>完整合法布局数</span></div>
+            <div class="metric"><small>当前深度</small><strong id="mDepth">0</strong><span>已放置皇后数</span></div>
+            <div class="metric"><small>活跃路径</small><strong id="mPath">[]</strong><span>当前部分解</span></div>
+          </div>
+        </section>
+
+        <section class="visuals">
+          <section class="stage">
+            <div class="stage-head">
+              <div><h2>棋盘状态</h2><p>红色边框表示当前冲突尝试，绿色边框表示当前成功放置。</p></div>
+              <div class="legend">
+                <span><i class="dot" style="color:var(--mint);background:var(--mint)"></i>成功放置</span>
+                <span><i class="dot" style="color:var(--rose);background:var(--rose)"></i>冲突位置</span>
+                <span><i class="dot" style="color:var(--indigo);background:var(--indigo)"></i>当前搜索行</span>
+              </div>
+            </div>
+            <div class="board-wrap">
+              <div id="board" class="board"></div>
+              <div id="boardNote" class="board-note">等待运行。点击“运行内置搜索”或导入 Python JSON 日志。</div>
+            </div>
+          </section>
+
+          <section class="stage">
+            <div class="stage-head">
+              <div><h2>搜索树</h2><p>金色表示当前活动路径，绿色表示已经形成完整解的叶子。</p></div>
+              <div class="legend">
+                <span><i class="dot" style="color:var(--gold);background:var(--gold)"></i>活动路径</span>
+                <span><i class="dot" style="color:var(--mint);background:var(--mint)"></i>解结点</span>
+                <span><i class="dot" style="color:var(--cyan);background:var(--cyan)"></i>已探索</span>
+              </div>
+            </div>
+            <div class="tree-wrap">
+              <canvas id="treeCanvas"></canvas>
+              <div class="tree-note">每一层对应棋盘的一行；一条从根到叶的路径对应一个完整解。</div>
+            </div>
+          </section>
+        </section>
+
+        <section class="lower-grid">
+          <div class="stack">
+            <section class="panel2">
+              <h2>本步状态</h2>
+              <div id="statusLine" class="status">等待运行。</div>
+              <div class="routes">
+                <div class="route"><label>当前部分解</label><div id="routeLine">[]</div></div>
+                <div class="route"><label>最近找到的完整解</label><div id="lastSolutionLine">尚未找到解</div></div>
+              </div>
+            </section>
+
+            <section class="panel2">
+              <h2>已找到的解</h2>
+              <div id="solutionList" class="solutions"></div>
+              <p class="foot">默认展示最近找到的 12 个解。完整结果可以通过“导出结果”保存。</p>
+            </section>
+
+            <section class="panel2">
+              <h2>文本结果</h2>
+              <pre id="resultOut">运行完成后，这里会给出解的总数和部分结果。</pre>
+            </section>
+          </div>
+
+          <section class="panel2">
+            <h2>搜索日志</h2>
+            <pre id="logOut">[搜索日志]
+等待运行...</pre>
+          </section>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const U={
+      size:gid("sizeInput"),speed:gid("speedInput"),speedOut:gid("speedOut"),file:gid("fileInput"),run:gid("runBtn"),load:gid("loadBtn"),
+      next:gid("nextBtn"),auto:gid("autoBtn"),restart:gid("restartBtn"),export:gid("exportBtn"),err:gid("errorBox"),
+      board:gid("board"),boardNote:gid("boardNote"),tree:gid("treeCanvas"),status:gid("statusLine"),route:gid("routeLine"),
+      lastSol:gid("lastSolutionLine"),log:gid("logOut"),result:gid("resultOut"),solutions:gid("solutionList"),
+      mStep:gid("mStep"),mTry:gid("mTry"),mBack:gid("mBack"),mSol:gid("mSol"),mDepth:gid("mDepth"),mPath:gid("mPath")
+    };
+    const A={data:null,pb:null,timer:null,queenImg:new Image()};
+    A.queenImg.src="assets/queen-token.png";
+    function gid(id){return document.getElementById(id)}
+    function showErr(msg){U.err.style.display="block";U.err.textContent=msg}
+    function hideErr(){U.err.style.display="none";U.err.textContent=""}
+    function syncSpeed(){U.speedOut.textContent=`${U.speed.value} ms`}
+    function keyOf(path){return path.join(",")}
+    function cleanPos(pos){return pos.map(v=>v==null?-1:v)}
+    function pathFromPositions(pos){const out=[];for(const v of pos){if(v==null||v===-1)break;out.push(v)}return out}
+    function pathText(path){return "["+path.join(", ")+"]"}
+    function stopAuto(){if(A.timer){clearInterval(A.timer);A.timer=null}U.auto.textContent="自动播放"}
+
+    function solveInternal(size){
+      const positions=Array(size).fill(null),cols=new Set(),d1=new Set(),d2=new Set(),solutions=[],steps=[];
+      let nodes=0,attempts=0,backs=0;
+      const snapBoard=()=>Array.from({length:size},(_,r)=>Array.from({length:size},(_,c)=>positions[r]===c?1:0));
+      const record=(action,row,col,message,success)=>{
+        steps.push({
+          index:steps.length+1,action,row,col,success:success??null,positions:[...positions],board:snapBoard(),message,
+          stats:{nodes,attempts,backtracks:backs,solutions:solutions.length}
+        });
+      };
+      const safe=(row,col)=>!cols.has(col)&&!d1.has(row-col)&&!d2.has(row+col);
+      function dfs(row){
+        if(row===size){
+          const sol=positions.map(v=>v);
+          solutions.push(sol);
+          record("solution",row-1,sol[sol.length-1],`找到第 ${solutions.length} 个解：${pathText(sol)}`,true);
+          return;
+        }
+        nodes++;
+        for(let col=0;col<size;col++){
+          attempts++;
+          const ok=safe(row,col);
+          record("try",row,col,`尝试在第 ${row+1} 行第 ${col+1} 列放置皇后。`,ok);
+          if(!ok){
+            record("reject",row,col,`第 ${row+1} 行第 ${col+1} 列与已有皇后冲突。`,false);
+            continue;
+          }
+          positions[row]=col;cols.add(col);d1.add(row-col);d2.add(row+col);
+          record("place",row,col,`在第 ${row+1} 行第 ${col+1} 列成功放置皇后。`,true);
+          dfs(row+1);
+          positions[row]=null;cols.delete(col);d1.delete(row-col);d2.delete(row+col);backs++;
+          record("backtrack",row,col,`从第 ${row+1} 行第 ${col+1} 列回溯，撤销该皇后。`,null);
+        }
+      }
+      record("start",0,null,`开始搜索 ${size} 皇后问题的全部解。`,null);
+      dfs(0);
+      record("finish",size,null,`搜索结束，共找到 ${solutions.length} 个解。`,true);
+      return{size,solutions,solution_count:solutions.length,stats:{nodes,attempts,backtracks:backs,steps:steps.length},steps};
+    }
+
+    function prepare(raw){
+      if(!raw||!Array.isArray(raw.steps))throw new Error("JSON 结构无效，缺少 steps 数组。");
+      const size=Number(raw.size||8);
+      const steps=raw.steps.map((step,index)=>{
+        const positions=cleanPos(step.positions||Array(size).fill(-1));
+        const path=pathFromPositions(positions);
+        return{
+          index:index+1,action:step.action||"unknown",row:step.row??null,col:step.col??null,success:step.success??null,
+          positions,path,board:step.board||null,message:step.message||"",stats:step.stats||{nodes:0,attempts:0,backtracks:0,solutions:0}
+        };
+      });
+      const nodes=[{id:0,parent:null,depth:0,path:[],key:""}],map=new Map([["",0]]);
+      for(const step of steps){
+        if(step.action==="place"||step.action==="solution"){
+          const key=keyOf(step.path);
+          if(!map.has(key)){
+            const parentPath=step.path.slice(0,-1),parentKey=keyOf(parentPath),parent=map.get(parentKey)??0;
+            const node={id:nodes.length,parent,depth:step.path.length,path:[...step.path],key};
+            nodes.push(node);map.set(key,node.id);
+          }
+        }
+      }
+      for(const step of steps){
+        step.activeNodeId=map.get(keyOf(step.path))??0;
+        step.nodeId=(step.action==="place"||step.action==="solution")?(map.get(keyOf(step.path))??0):null;
+      }
+      return{size,solutions:raw.solutions||[],solution_count:Number(raw.solution_count||0),stats:raw.stats||{},steps,nodes};
+    }
+
+    function newPb(data){
+      return{
+        idx:0,current:null,visible:new Set([0]),solutionKeys:new Set(),logs:["[搜索日志]","等待运行..."],lastSolutions:[]
+      };
+    }
+
+    function setupBoard(size){
+      U.board.innerHTML="";
+      U.board.style.gridTemplateColumns=`repeat(${size}, 1fr)`;
+      U.board.style.gridTemplateRows=`repeat(${size}, 1fr)`;
+      for(let r=0;r<size;r++){
+        for(let c=0;c<size;c++){
+          const cell=document.createElement("div");
+          cell.className=`cell ${(r+c)%2===0?"light":"dark"}`;
+          cell.dataset.row=String(r);cell.dataset.col=String(c);
+          const idx=document.createElement("span");
+          idx.className="idx";idx.textContent=`${r+1},${c+1}`;
+          cell.appendChild(idx);
+          U.board.appendChild(cell);
+        }
+      }
+    }
+
+    function applyStep(step){
+      A.pb.current=step;
+      if(step.nodeId!=null)A.pb.visible.add(step.nodeId);
+      if(step.action==="solution"){
+        A.pb.solutionKeys.add(keyOf(step.path));
+        A.pb.lastSolutions.push([...step.path]);
+        if(A.pb.lastSolutions.length>12)A.pb.lastSolutions.shift();
+      }
+      A.pb.logs.push(`Step ${A.pb.idx+1}: ${step.message}`);
+      if(A.pb.logs.length>50)A.pb.logs.splice(1,A.pb.logs.length-50);
+    }
+
+    function renderBoard(){
+      const size=A.data?A.data.size:Number(U.size.value||8),step=A.pb&&A.pb.current;
+      if(!U.board.children.length||U.board.children.length!==size*size)setupBoard(size);
+      const positions=step?step.positions:Array(size).fill(-1),focus=step&&step.row!=null&&step.col!=null?[step.row,step.col]:null,activeRow=step&&step.row!=null?step.row:null;
+      [...U.board.children].forEach((cell)=>{
+        const r=Number(cell.dataset.row),c=Number(cell.dataset.col),queen=positions[r]===c;
+        cell.classList.toggle("active-row",activeRow===r);
+        cell.classList.remove("focus-ok","focus-bad");
+        if(focus&&focus[0]===r&&focus[1]===c){
+          if(step.action==="place"||step.success===true)cell.classList.add("focus-ok");
+          else if(step.action==="reject"||step.success===false)cell.classList.add("focus-bad");
+        }
+        const old=cell.querySelector("img");if(old)old.remove();
+        if(queen){
+          const img=document.createElement("img");
+          img.src=A.queenImg.src;img.alt="Q";
+          cell.appendChild(img);
+        }
+      });
+      U.boardNote.textContent=step?step.message:"等待运行。点击“运行内置搜索”或导入 Python JSON 日志。";
+    }
+
+    function resize(canvas){
+      const dpr=window.devicePixelRatio||1,w=Math.max(320,canvas.clientWidth),h=Math.max(260,canvas.clientHeight),nw=Math.floor(w*dpr),nh=Math.floor(h*dpr);
+      if(canvas.width!==nw||canvas.height!==nh){canvas.width=nw;canvas.height=nh}
+      const c=canvas.getContext("2d");c.setTransform(dpr,0,0,dpr,0,0);return{c,w,h};
+    }
+
+    function drawTree(){
+      const {c,w,h}=resize(U.tree);c.clearRect(0,0,w,h);
+      c.strokeStyle="rgba(99,229,255,.05)";for(let x=24;x<w;x+=42){c.beginPath();c.moveTo(x,0);c.lineTo(x,h);c.stroke()}
+      for(let y=24;y<h;y+=42){c.beginPath();c.moveTo(0,y);c.lineTo(w,y);c.stroke()}
+      if(!A.data||!A.pb){c.fillStyle="rgba(247,255,253,.75)";c.font="16px Segoe UI";c.fillText("搜索树会在这里展开",24,36);return}
+      const visible=A.data.nodes.filter(n=>A.pb.visible.has(n.id)),levels=[],pos={};
+      visible.forEach(n=>{if(!levels[n.depth])levels[n.depth]=[];levels[n.depth].push(n)});
+      const maxDepth=Math.max(...visible.map(n=>n.depth),0),tp=46,lp=34,rp=24,bp=26,g=maxDepth>0?(h-tp-bp)/maxDepth:1;
+      levels.forEach((arr,d)=>arr.forEach((n,i)=>{pos[n.id]={x:lp+((w-lp-rp)*(i+1))/(arr.length+1),y:tp+d*g}}));
+      const current=A.pb.current?A.pb.current.path:[],activeKeys=new Set([""]);for(let i=1;i<=current.length;i++)activeKeys.add(keyOf(current.slice(0,i)));
+      visible.forEach(n=>{if(n.parent==null||!pos[n.parent])return;let stroke="rgba(99,229,255,.18)",lw=1.2;if(activeKeys.has(n.key)){stroke="rgba(255,209,102,.72)";lw=2.1}else if(A.pb.solutionKeys.has(n.key)){stroke="rgba(94,242,190,.6)";lw=1.8}
+        c.strokeStyle=stroke;c.lineWidth=lw;c.beginPath();c.moveTo(pos[n.parent].x,pos[n.parent].y);c.lineTo(pos[n.id].x,pos[n.id].y);c.stroke()});
+      visible.forEach(n=>{let fill="rgba(99,229,255,.72)",stroke="rgba(218,252,255,.35)",r=4.6;if(n.depth===0){fill="rgba(122,131,255,.9)";r=6}
+        if(activeKeys.has(n.key)){fill="rgba(255,209,102,.95)";stroke="rgba(255,242,206,.88)";r=6.4}else if(A.pb.solutionKeys.has(n.key)){fill="rgba(94,242,190,.96)";stroke="rgba(229,255,245,.86)";r=6.2}
+        c.save();c.shadowBlur=activeKeys.has(n.key)||A.pb.solutionKeys.has(n.key)?18:8;c.shadowColor=fill;c.fillStyle=fill;c.strokeStyle=stroke;c.lineWidth=1.2;c.beginPath();c.arc(pos[n.id].x,pos[n.id].y,r,0,Math.PI*2);c.fill();c.stroke();c.restore()});
+      if(A.pb.current){
+        c.fillStyle="rgba(238,251,255,.88)";c.font="12px Cascadia Code";c.fillText(`当前路径: ${pathText(A.pb.current.path)}`,20,h-18);
+      }
+    }
+
+    function renderMetrics(){
+      if(!A.data||!A.pb||!A.pb.current){U.mStep.textContent="0 / 0";U.mTry.textContent="0";U.mBack.textContent="0";U.mSol.textContent="0";U.mDepth.textContent="0";U.mPath.textContent="[]";return}
+      const s=A.pb.current.stats||{};
+      U.mStep.textContent=`${A.pb.idx} / ${A.data.steps.length}`;
+      U.mTry.textContent=String(s.attempts||0);
+      U.mBack.textContent=String(s.backtracks||0);
+      U.mSol.textContent=String(s.solutions||0);
+      U.mDepth.textContent=String(A.pb.current.path.length);
+      U.mPath.textContent=pathText(A.pb.current.path);
+    }
+
+    function renderText(){
+      if(!A.data||!A.pb||!A.pb.current){
+        U.status.textContent="等待运行。";U.route.textContent="[]";U.lastSol.textContent="尚未找到解";U.log.textContent="[搜索日志]\n等待运行...";U.result.textContent="运行完成后，这里会给出解的总数和部分结果。";U.solutions.innerHTML="";return;
+      }
+      const step=A.pb.current;
+      U.status.textContent=step.message;
+      U.route.textContent=pathText(step.path);
+      U.lastSol.textContent=A.pb.lastSolutions.length?pathText(A.pb.lastSolutions[A.pb.lastSolutions.length-1]):"尚未找到解";
+      U.log.textContent=A.pb.logs.join("\n");
+      const lines=[`棋盘大小: ${A.data.size} x ${A.data.size}`,`当前播放步骤: ${A.pb.idx} / ${A.data.steps.length}`,`已找到解数: ${step.stats.solutions||0}`,`递归结点数: ${step.stats.nodes||0}`,`尝试次数: ${step.stats.attempts||0}`,`回溯次数: ${step.stats.backtracks||0}`,""];
+      const found=A.pb.lastSolutions.slice(-6);
+      found.forEach((sol,i)=>lines.push(`最近解 ${found.length-i}: ${pathText(sol)}`));
+      U.result.textContent=lines.join("\n");
+      U.solutions.innerHTML="";
+      A.pb.lastSolutions.slice().reverse().forEach((sol,idx)=>{
+        const card=document.createElement("div");card.className="solution";
+        card.innerHTML=`<strong>解 ${A.pb.lastSolutions.length-idx}</strong><div>${pathText(sol)}</div>`;
+        U.solutions.appendChild(card);
+      });
+    }
+
+    function updateButtons(){
+      const ok=!!(A.data&&A.pb),done=ok?A.pb.idx>=A.data.steps.length:true;
+      U.next.disabled=!ok||done;U.auto.disabled=!ok||done;U.restart.disabled=!ok;U.export.disabled=!ok;
+    }
+
+    function renderAll(){renderBoard();drawTree();renderMetrics();renderText();updateButtons()}
+
+    function stepOnce(){
+      if(!A.data||!A.pb)return false;
+      if(A.pb.idx>=A.data.steps.length){stopAuto();updateButtons();return false}
+      const step=A.data.steps[A.pb.idx];applyStep(step);A.pb.idx++;renderAll();if(A.pb.idx>=A.data.steps.length)stopAuto();return true;
+    }
+
+    function startWithData(data){
+      hideErr();stopAuto();A.data=prepare(data);A.pb=newPb(A.data);setupBoard(A.data.size);renderAll();stepOnce();
+    }
+
+    function runBuiltIn(){
+      try{
+        const size=Number(U.size.value);
+        if(!Number.isInteger(size)||size<4||size>10)throw new Error("内置搜索要求棋盘大小在 4 到 10 之间。");
+        startWithData(solveInternal(size));
+      }catch(e){showErr(e instanceof Error?e.message:String(e))}
+    }
+
+    async function loadJson(){
+      try{
+        const file=U.file.files&&U.file.files[0];
+        if(!file)throw new Error("请先选择一个 JSON 文件。");
+        const text=await file.text();
+        startWithData(JSON.parse(text));
+      }catch(e){showErr(e instanceof Error?e.message:String(e))}
+    }
+
+    function restart(){if(!A.data)return;stopAuto();A.pb=newPb(A.data);setupBoard(A.data.size);renderAll();stepOnce()}
+    function toggleAuto(){if(!A.data||!A.pb)return;if(A.timer){stopAuto();return}U.auto.textContent="暂停播放";A.timer=setInterval(()=>{const ok=stepOnce();if(!ok)stopAuto()},Number(U.speed.value))}
+
+    function exportResult(){
+      if(!A.data)return;
+      const txt=[
+        "八皇后回溯实验导出",
+        `棋盘大小: ${A.data.size}`,
+        `解的总数: ${A.data.solution_count||A.data.solutions.length}`,
+        `步骤总数: ${A.data.steps.length}`,
+        "",
+        ...A.data.solutions.map((sol,idx)=>`解 ${idx+1}: ${pathText(sol)}`)
+      ].join("\n");
+      const blob=new Blob([txt],{type:"text/plain;charset=utf-8"}),a=document.createElement("a");
+      a.href=URL.createObjectURL(blob);a.download="eight_queens_result.txt";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(a.href);
+    }
+
+    U.speed.addEventListener("input",()=>{syncSpeed();if(A.timer){stopAuto();toggleAuto()}});
+    U.run.addEventListener("click",runBuiltIn);U.load.addEventListener("click",()=>{loadJson()});U.next.addEventListener("click",stepOnce);
+    U.auto.addEventListener("click",toggleAuto);U.restart.addEventListener("click",restart);U.export.addEventListener("click",exportResult);
+    window.addEventListener("resize",drawTree);
+    syncSpeed();setupBoard(8);renderAll();
+  </script>
+</body>
+</html>
