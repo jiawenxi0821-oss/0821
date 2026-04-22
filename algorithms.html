@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>算法可视化导航</title>
+  <style>
+    :root {
+      --bg: #09111f;
+      --panel: rgba(10, 20, 36, 0.9);
+      --line: rgba(255, 255, 255, 0.09);
+      --text: #e9f0f7;
+      --muted: #a3b6ca;
+      --accent: #74d3ff;
+      --accent-2: #f3b660;
+      --shadow: 0 24px 50px rgba(0, 0, 0, 0.28);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: "MiSans", "HarmonyOS Sans SC", "Microsoft YaHei UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(116, 211, 255, 0.14), transparent 26%),
+        radial-gradient(circle at bottom right, rgba(243, 182, 96, 0.12), transparent 24%),
+        linear-gradient(160deg, #07101c, #0d1c31 56%, #09111f);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .shell {
+      width: min(980px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      padding: 30px;
+      backdrop-filter: blur(14px);
+    }
+
+    .eyebrow {
+      color: var(--accent);
+      font-size: 0.86rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(2rem, 3vw, 3.2rem);
+      line-height: 1.08;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.8;
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 26px;
+    }
+
+    .card {
+      display: grid;
+      gap: 14px;
+      padding: 22px;
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      min-width: 0;
+    }
+
+    .card h2 {
+      margin: 0;
+      font-size: 1.18rem;
+    }
+
+    .tag {
+      display: inline-flex;
+      width: fit-content;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #08111d;
+      background: linear-gradient(135deg, #8fe1ff, #74d3ff);
+    }
+
+    .tag.alt {
+      background: linear-gradient(135deg, #ffd79e, #f3b660);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    a.btn {
+      text-decoration: none;
+      color: #08111d;
+      background: linear-gradient(135deg, #d4f4ff, #74d3ff);
+      padding: 11px 14px;
+      border-radius: 14px;
+      font-weight: 700;
+      transition: transform 0.18s ease;
+    }
+
+    a.btn:hover {
+      transform: translateY(-1px);
+    }
+
+    a.btn.alt {
+      background: linear-gradient(135deg, #ffe7bf, #f3b660);
+    }
+
+    .footer {
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.75;
+    }
+
+    @media (max-width: 760px) {
+      .shell { padding: 22px 18px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="eyebrow">Algorithm Demos</div>
+    <h1>分支限界法与最短路动态展示</h1>
+    <p>
+      这里收纳了两个独立的课程实验网页。一个用于展示“马走日 + 田字”的最少步数动态路径，
+      另一个用于展示 TSP 分支限界法的搜索、扩展、剪枝和最优回路更新过程。
+    </p>
+
+    <section class="grid">
+      <article class="card">
+        <span class="tag">最少步数</span>
+        <h2>棋盘最短路径动态演示</h2>
+        <p>
+          输入两个起点坐标，页面会分别计算它们到左上角 `(1,1)` 的最少步数，并在棋盘上播放最短路径过程。
+        </p>
+        <div class="actions">
+          <a class="btn" href="./chess_demo.html">打开演示页</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <span class="tag alt">TSP</span>
+        <h2>旅行商分支限界法可视化</h2>
+        <p>
+          输入城市代价矩阵后，页面会显示初始上界、当前结点下界、活结点队列以及最优回路更新过程。
+        </p>
+        <div class="actions">
+          <a class="btn alt" href="./tsp_visualizer.html">打开演示页</a>
+        </div>
+      </article>
+    </section>
+
+    <div class="footer">
+      如果你想直接访问原页面，也可以使用：<br>
+      `./chess_demo.html` 与 `./tsp_visualizer.html`
+    </div>
+  </main>
+</body>
+</html>

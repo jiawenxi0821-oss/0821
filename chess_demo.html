@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>最少步数动态演示</title>
+<style>
+  :root {
+    --bg-1: #0c1424;
+    --bg-2: #112039;
+    --panel: rgba(10, 20, 35, 0.82);
+    --panel-border: rgba(140, 197, 255, 0.18);
+    --grid-dark: #12243f;
+    --grid-light: #173052;
+    --line: rgba(152, 208, 255, 0.16);
+    --text: #e8f4ff;
+    --muted: #9db5d4;
+    --accent: #8cd8ff;
+    --gold: #f4c24f;
+    --green: #4ce0b3;
+    --red: #ff7f7f;
+    --shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--text);
+    font-family: "MiSans", "HarmonyOS Sans SC", "Microsoft YaHei UI", sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(76, 224, 179, 0.14), transparent 34%),
+      radial-gradient(circle at top right, rgba(244, 194, 79, 0.14), transparent 28%),
+      linear-gradient(135deg, var(--bg-1), var(--bg-2));
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent 85%);
+  }
+
+  .page {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 28px 20px 24px;
+  }
+
+  .hero {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+
+  .eyebrow {
+    color: var(--accent);
+    font-size: 0.88rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(2rem, 3vw, 3.35rem);
+    line-height: 1.08;
+    letter-spacing: 0.02em;
+  }
+
+  .hero p {
+    margin: 0;
+    max-width: 900px;
+    color: var(--muted);
+    font-size: 1rem;
+    line-height: 1.75;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 360px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(12px);
+  }
+
+  .sidebar {
+    display: grid;
+    gap: 14px;
+  }
+
+  .section {
+    padding: 18px;
+  }
+
+  .section h2 {
+    margin: 0 0 14px;
+    font-size: 1rem;
+    letter-spacing: 0.05em;
+  }
+
+  .section-subtitle {
+    margin: -8px 0 14px;
+    color: var(--muted);
+    line-height: 1.7;
+    font-size: 0.92rem;
+  }
+
+  .coord-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+
+  .coord-card:last-child {
+    margin-bottom: 0;
+  }
+
+  .coord-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-weight: 700;
+  }
+
+  .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+  }
+
+  .dot.a {
+    background: var(--green);
+    box-shadow: 0 0 18px rgba(76, 224, 179, 0.85);
+  }
+
+  .dot.b {
+    background: var(--red);
+    box-shadow: 0 0 18px rgba(255, 127, 127, 0.85);
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  label {
+    display: grid;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  input[type="number"],
+  input[type="range"] {
+    width: 100%;
+  }
+
+  input[type="number"] {
+    appearance: textfield;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(5, 9, 20, 0.68);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  input[type="number"]:focus {
+    border-color: rgba(140, 216, 255, 0.75);
+    box-shadow: 0 0 0 3px rgba(140, 216, 255, 0.12);
+    transform: translateY(-1px);
+  }
+
+  .button-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  button {
+    border: 0;
+    border-radius: 14px;
+    padding: 12px 14px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    color: #06101d;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  }
+
+  button:hover {
+    transform: translateY(-1px);
+  }
+
+  button:active {
+    transform: translateY(0);
+  }
+
+  .primary {
+    background: linear-gradient(135deg, #b8efff, #7ec7ff);
+    box-shadow: 0 12px 22px rgba(126, 199, 255, 0.26);
+  }
+
+  .secondary {
+    background: linear-gradient(135deg, #f7dfa5, #f2bd49);
+    box-shadow: 0 12px 22px rgba(244, 194, 79, 0.24);
+  }
+
+  .ghost {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: none;
+  }
+
+  .danger {
+    background: linear-gradient(135deg, #ffc0c0, #ff8f8f);
+    box-shadow: 0 12px 22px rgba(255, 127, 127, 0.2);
+  }
+
+  .speed-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 10px;
+    align-items: center;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  input[type="range"] {
+    accent-color: #7ec7ff;
+  }
+
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .result-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 18px;
+    padding: 14px;
+  }
+
+  .result-card small {
+    display: block;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .result-value {
+    font-size: clamp(2.1rem, 4vw, 3rem);
+    line-height: 1;
+    font-weight: 800;
+  }
+
+  .value-a {
+    color: var(--green);
+  }
+
+  .value-b {
+    color: var(--red);
+  }
+
+  .winner {
+    border-radius: 16px;
+    padding: 14px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+    color: var(--text);
+    line-height: 1.75;
+    min-height: 78px;
+  }
+
+  .status-box {
+    color: var(--muted);
+    line-height: 1.78;
+    min-height: 118px;
+  }
+
+  .status-box strong {
+    color: var(--text);
+  }
+
+  .route-panel {
+    max-height: 220px;
+    overflow: auto;
+    display: grid;
+    gap: 12px;
+    padding-right: 4px;
+  }
+
+  .route-group strong {
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .route-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chip {
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    line-height: 1.25;
+    border: 1px solid transparent;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .chip.a {
+    color: #c6fff0;
+    background: rgba(76, 224, 179, 0.12);
+    border-color: rgba(76, 224, 179, 0.25);
+  }
+
+  .chip.b {
+    color: #ffdede;
+    background: rgba(255, 127, 127, 0.12);
+    border-color: rgba(255, 127, 127, 0.24);
+  }
+
+  .notes {
+    display: grid;
+    gap: 8px;
+    color: var(--muted);
+    line-height: 1.75;
+    font-size: 0.93rem;
+  }
+
+  .notes strong {
+    color: var(--text);
+  }
+
+  .board-panel {
+    padding: 18px;
+    display: grid;
+    gap: 14px;
+  }
+
+  .board-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .board-top h2 {
+    margin: 0;
+    font-size: 1.06rem;
+  }
+
+  .board-top p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+
+  .mini-stats {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .stat-pill {
+    padding: 10px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--muted);
+    font-size: 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .stat-pill strong {
+    color: var(--text);
+  }
+
+  .canvas-shell {
+    position: relative;
+    border-radius: 24px;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at top, rgba(140, 216, 255, 0.12), transparent 36%),
+      linear-gradient(180deg, rgba(8, 18, 33, 0.9), rgba(7, 14, 27, 0.95));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 14px;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 18px;
+    background: #0a1422;
+  }
+
+  .legend {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .legend-mark {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+  }
+
+  .legend-mark.a {
+    background: var(--green);
+  }
+
+  .legend-mark.b {
+    background: var(--red);
+  }
+
+  .legend-mark.target {
+    background: var(--gold);
+  }
+
+  .legend-mark.route {
+    background: #9dd7ff;
+  }
+
+  .footer-bar {
+    margin-top: 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    padding: 14px 16px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  @media (max-width: 1100px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+      order: 2;
+    }
+  }
+
+  @media (max-width: 680px) {
+    .page {
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+
+    .section,
+    .board-panel {
+      padding: 16px;
+    }
+
+    .button-row,
+    .field-row,
+    .result-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div class="eyebrow">Experiment 8 / Shortest Path Demo</div>
+      <h1>分支限界题目的网页动态展示</h1>
+      <p>
+        两枚棋子都可以按“日”字和“田”字移动。输入起点后，页面会用 BFS 求出到左上角
+        <strong>(1,1)</strong> 的最短路径，并在棋盘上同步播放黑马 A 与白马 B 的移动过程。
+      </p>
+    </section>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <section class="panel section">
+          <h2>坐标输入</h2>
+          <p class="section-subtitle">坐标范围是 1 到 100，默认已经填入题目样例。</p>
+
+          <div class="coord-card">
+            <div class="coord-title">
+              <span class="dot a"></span>
+              <span>黑马 A 起点</span>
+            </div>
+            <div class="field-row">
+              <label>行
+                <input id="ax" type="number" min="1" max="100" value="12">
+              </label>
+              <label>列
+                <input id="ay" type="number" min="1" max="100" value="16">
+              </label>
+            </div>
+          </div>
+
+          <div class="coord-card">
+            <div class="coord-title">
+              <span class="dot b"></span>
+              <span>白马 B 起点</span>
+            </div>
+            <div class="field-row">
+              <label>行
+                <input id="bx" type="number" min="1" max="100" value="18">
+              </label>
+              <label>列
+                <input id="by" type="number" min="1" max="100" value="10">
+              </label>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="primary" id="startBtn">开始演示</button>
+            <button class="secondary" id="sampleBtn">载入样例</button>
+          </div>
+        </section>
+
+        <section class="panel section">
+          <h2>动画控制</h2>
+          <div class="speed-row">
+            <span>速度</span>
+            <input id="speedSlider" type="range" min="1" max="10" value="5">
+            <strong id="speedLabel">中速</strong>
+          </div>
+
+          <div class="button-row">
+            <button class="ghost" id="playBtn">暂停</button>
+            <button class="ghost" id="stepBtn">单步前进</button>
+          </div>
+
+          <div class="button-row">
+            <button class="ghost" id="resetBtn">重置动画</button>
+            <button class="danger" id="clearBtn">清空结果</button>
+          </div>
+        </section>
+
+        <section class="panel section">
+          <h2>计算结果</h2>
+          <div class="result-grid">
+            <div class="result-card">
+              <small>黑马 A 的最少步数</small>
+              <div class="result-value value-a" id="resultA">-</div>
+            </div>
+            <div class="result-card">
+              <small>白马 B 的最少步数</small>
+              <div class="result-value value-b" id="resultB">-</div>
+            </div>
+          </div>
+          <div class="winner" id="winnerBox">等待开始演示。</div>
+        </section>
+
+        <section class="panel section">
+          <h2>当前状态</h2>
+          <div class="status-box" id="statusBox">
+            输入两组坐标后点击“开始演示”，页面会计算最短路径并自动播放。
+          </div>
+        </section>
+
+        <section class="panel section">
+          <h2>路径明细</h2>
+          <div class="route-panel" id="routePanel">
+            <div class="notes">还没有生成路径。</div>
+          </div>
+        </section>
+
+        <section class="panel section">
+          <h2>规则说明</h2>
+          <div class="notes">
+            <div><strong>目标点：</strong>到达左上角坐标 <strong>(1,1)</strong>。</div>
+            <div><strong>日字走法：</strong>像中国象棋中的马，位移是 <strong>(±1, ±2)</strong> 或 <strong>(±2, ±1)</strong>。</div>
+            <div><strong>田字走法：</strong>斜走两格，位移是 <strong>(±2, ±2)</strong>。</div>
+            <div><strong>算法：</strong>页面与 Python 程序都使用 BFS 求最短步数。</div>
+          </div>
+        </section>
+      </aside>
+
+      <main class="panel board-panel">
+        <div class="board-top">
+          <div>
+            <h2>棋盘动态过程</h2>
+            <p id="boardSummary">显示窗口会自动聚焦到两条最短路径和目标点，便于观察整段移动过程。</p>
+          </div>
+          <div class="mini-stats">
+            <div class="stat-pill"><strong id="progressText">0 / 0</strong> 动画步数</div>
+            <div class="stat-pill"><strong id="viewportText">行 1-20，列 1-20</strong> 显示范围</div>
+          </div>
+        </div>
+
+        <div class="canvas-shell">
+          <canvas id="boardCanvas"></canvas>
+        </div>
+
+        <div class="legend">
+          <span class="legend-item"><span class="legend-mark a"></span> 黑马 A</span>
+          <span class="legend-item"><span class="legend-mark b"></span> 白马 B</span>
+          <span class="legend-item"><span class="legend-mark target"></span> 目标点 (1,1)</span>
+          <span class="legend-item"><span class="legend-mark route"></span> 已走过的最短路径</span>
+        </div>
+      </main>
+    </div>
+
+    <div class="footer-bar" id="footerBar">
+      这是一个独立静态网页，直接双击打开即可演示，无需后端。
+    </div>
+  </div>
+
+<script>
+  "use strict";
+
+  const BOARD_SIZE = 100;
+  const TARGET = [1, 1];
+  const MOVES = [
+    [1, 2],
+    [1, -2],
+    [-1, 2],
+    [-1, -2],
+    [2, 1],
+    [2, -1],
+    [-2, 1],
+    [-2, -1],
+    [2, 2],
+    [2, -2],
+    [-2, 2],
+    [-2, -2]
+  ];
+
+  const SPEED_LABELS = ["", "极慢", "较慢", "偏慢", "中慢", "中速", "偏快", "较快", "快速", "很快", "极快"];
+
+  const canvas = document.getElementById("boardCanvas");
+  const ctx = canvas.getContext("2d");
+
+  const dom = {
+    ax: document.getElementById("ax"),
+    ay: document.getElementById("ay"),
+    bx: document.getElementById("bx"),
+    by: document.getElementById("by"),
+    resultA: document.getElementById("resultA"),
+    resultB: document.getElementById("resultB"),
+    winnerBox: document.getElementById("winnerBox"),
+    statusBox: document.getElementById("statusBox"),
+    routePanel: document.getElementById("routePanel"),
+    footerBar: document.getElementById("footerBar"),
+    boardSummary: document.getElementById("boardSummary"),
+    progressText: document.getElementById("progressText"),
+    viewportText: document.getElementById("viewportText"),
+    speedSlider: document.getElementById("speedSlider"),
+    speedLabel: document.getElementById("speedLabel"),
+    playBtn: document.getElementById("playBtn")
+  };
+
+  const state = {
+    resultA: null,
+    resultB: null,
+    currentStep: 0,
+    totalSteps: 0,
+    playing: false,
+    timer: null,
+    speed: 5,
+    viewport: { minRow: 1, maxRow: 20, minCol: 1, maxCol: 20 },
+    canvasWidth: 0,
+    canvasHeight: 0
+  };
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function validateCoordinate(value) {
+    return Number.isInteger(value) && value >= 1 && value <= 100;
+  }
+
+  function moveName(from, to) {
+    const dr = Math.abs(to[0] - from[0]);
+    const dc = Math.abs(to[1] - from[1]);
+    return dr === 2 && dc === 2 ? "田字" : "日字";
+  }
+
+  function bfs(startRow, startCol) {
+    const dist = Array.from({ length: BOARD_SIZE + 1 }, () => Array(BOARD_SIZE + 1).fill(-1));
+    const prevRow = Array.from({ length: BOARD_SIZE + 1 }, () => Array(BOARD_SIZE + 1).fill(0));
+    const prevCol = Array.from({ length: BOARD_SIZE + 1 }, () => Array(BOARD_SIZE + 1).fill(0));
+    const queue = [];
+    let head = 0;
+
+    dist[startRow][startCol] = 0;
+    queue.push([startRow, startCol]);
+
+    while (head < queue.length) {
+      const [row, col] = queue[head++];
+      if (row === 1 && col === 1) {
+        break;
+      }
+
+      for (const [dr, dc] of MOVES) {
+        const nr = row + dr;
+        const nc = col + dc;
+
+        if (nr < 1 || nr > BOARD_SIZE || nc < 1 || nc > BOARD_SIZE) {
+          continue;
+        }
+        if (dist[nr][nc] !== -1) {
+          continue;
+        }
+
+        dist[nr][nc] = dist[row][col] + 1;
+        prevRow[nr][nc] = row;
+        prevCol[nr][nc] = col;
+        queue.push([nr, nc]);
+      }
+    }
+
+    if (dist[1][1] === -1) {
+      return null;
+    }
+
+    const path = [];
+    let row = 1;
+    let col = 1;
+    while (!(row === startRow && col === startCol)) {
+      path.push([row, col]);
+      const nextRow = prevRow[row][col];
+      const nextCol = prevCol[row][col];
+      row = nextRow;
+      col = nextCol;
+    }
+    path.push([startRow, startCol]);
+    path.reverse();
+
+    const moves = path.map((point, index) => {
+      if (index === 0) {
+        return "起点";
+      }
+      return moveName(path[index - 1], point);
+    });
+
+    return {
+      steps: dist[1][1],
+      path,
+      moves
+    };
+  }
+
+  function buildViewport(pathA, pathB) {
+    let minRow = 100;
+    let maxRow = 1;
+    let minCol = 100;
+    let maxCol = 1;
+
+    for (const [row, col] of [...pathA, ...pathB, TARGET]) {
+      minRow = Math.min(minRow, row);
+      maxRow = Math.max(maxRow, row);
+      minCol = Math.min(minCol, col);
+      maxCol = Math.max(maxCol, col);
+    }
+
+    const span = Math.max(maxRow - minRow + 1, maxCol - minCol + 1);
+    const padding = Math.max(2, Math.ceil(span * 0.12));
+
+    return {
+      minRow: clamp(minRow - padding, 1, BOARD_SIZE),
+      maxRow: clamp(maxRow + padding, 1, BOARD_SIZE),
+      minCol: clamp(minCol - padding, 1, BOARD_SIZE),
+      maxCol: clamp(maxCol + padding, 1, BOARD_SIZE)
+    };
+  }
+
+  function getDelay() {
+    return Math.max(80, 920 - (state.speed - 1) * 86);
+  }
+
+  function getStepInfo(result, step) {
+    const pathStep = Math.min(step, result.path.length - 1);
+    const point = result.path[pathStep];
+    const reached = pathStep >= result.path.length - 1;
+    const moveText = pathStep === 0 ? "尚未移动" : result.moves[pathStep] + "移动";
+    return {
+      row: point[0],
+      col: point[1],
+      step: pathStep,
+      reached,
+      moveText
+    };
+  }
+
+  function toCanvasPoint(row, col) {
+    const width = state.canvasWidth;
+    const height = state.canvasHeight;
+    const topPadding = 52;
+    const bottomPadding = 28;
+    const sidePadding = 40;
+
+    const rows = state.viewport.maxRow - state.viewport.minRow + 1;
+    const cols = state.viewport.maxCol - state.viewport.minCol + 1;
+    const cellSize = Math.min(
+      (width - sidePadding * 2) / cols,
+      (height - topPadding - bottomPadding) / rows
+    );
+
+    const boardWidth = cols * cellSize;
+    const boardHeight = rows * cellSize;
+    const originX = (width - boardWidth) / 2;
+    const originY = (height - boardHeight) / 2 + 10;
+
+    const x = originX + (col - state.viewport.minCol + 0.5) * cellSize;
+    const y = originY + (row - state.viewport.minRow + 0.5) * cellSize;
+
+    return { x, y, cellSize, originX, originY, boardWidth, boardHeight, rows, cols };
+  }
+
+  function drawBoardBase() {
+    const width = state.canvasWidth;
+    const height = state.canvasHeight;
+    ctx.clearRect(0, 0, width, height);
+
+    const cornerGradient = ctx.createLinearGradient(0, 0, width, height);
+    cornerGradient.addColorStop(0, "#12253f");
+    cornerGradient.addColorStop(1, "#081221");
+    ctx.fillStyle = cornerGradient;
+    ctx.fillRect(0, 0, width, height);
+
+    const center = toCanvasPoint(state.viewport.minRow, state.viewport.minCol);
+    const { originX, originY, boardWidth, boardHeight, cellSize, rows, cols } = center;
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.02)";
+    ctx.fillRect(originX, originY, boardWidth, boardHeight);
+
+    for (let r = 0; r < rows; r += 1) {
+      for (let c = 0; c < cols; c += 1) {
+        ctx.fillStyle = (r + c) % 2 === 0 ? "rgba(23, 48, 82, 0.64)" : "rgba(18, 36, 63, 0.78)";
+        ctx.fillRect(originX + c * cellSize, originY + r * cellSize, cellSize, cellSize);
+      }
+    }
+
+    const target = toCanvasPoint(1, 1);
+    if (
+      1 >= state.viewport.minRow &&
+      1 <= state.viewport.maxRow &&
+      1 >= state.viewport.minCol &&
+      1 <= state.viewport.maxCol
+    ) {
+      ctx.fillStyle = "rgba(244, 194, 79, 0.22)";
+      ctx.fillRect(
+        target.x - cellSize / 2,
+        target.y - cellSize / 2,
+        cellSize,
+        cellSize
+      );
+    }
+
+    ctx.strokeStyle = "rgba(160, 214, 255, 0.13)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= cols; i += 1) {
+      const x = originX + i * cellSize;
+      ctx.beginPath();
+      ctx.moveTo(x, originY);
+      ctx.lineTo(x, originY + boardHeight);
+      ctx.stroke();
+    }
+    for (let i = 0; i <= rows; i += 1) {
+      const y = originY + i * cellSize;
+      ctx.beginPath();
+      ctx.moveTo(originX, y);
+      ctx.lineTo(originX + boardWidth, y);
+      ctx.stroke();
+    }
+
+    const tickStep = Math.max(1, Math.ceil(Math.max(rows, cols) / 10));
+    const fontSize = clamp(cellSize * 0.34, 10, 14);
+    ctx.fillStyle = "rgba(232, 244, 255, 0.65)";
+    ctx.font = `${fontSize}px "Microsoft YaHei UI"`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    for (let col = state.viewport.minCol; col <= state.viewport.maxCol; col += tickStep) {
+      const point = toCanvasPoint(state.viewport.minRow, col);
+      ctx.fillText(String(col), point.x, originY - 8);
+    }
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    for (let row = state.viewport.minRow; row <= state.viewport.maxRow; row += tickStep) {
+      const point = toCanvasPoint(row, state.viewport.minCol);
+      ctx.fillText(String(row), originX - 8, point.y);
+    }
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.09)";
+    ctx.strokeRect(originX, originY, boardWidth, boardHeight);
+  }
+
+  function drawTarget() {
+    if (
+      1 < state.viewport.minRow ||
+      1 > state.viewport.maxRow ||
+      1 < state.viewport.minCol ||
+      1 > state.viewport.maxCol
+    ) {
+      return;
+    }
+
+    const { x, y, cellSize } = toCanvasPoint(1, 1);
+    const radius = clamp(cellSize * 0.26, 6, 20);
+
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, radius * 4);
+    glow.addColorStop(0, "rgba(244, 194, 79, 0.42)");
+    glow.addColorStop(1, "rgba(244, 194, 79, 0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#f4c24f";
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.78)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 4, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x - radius - 6, y);
+    ctx.lineTo(x + radius + 6, y);
+    ctx.moveTo(x, y - radius - 6);
+    ctx.lineTo(x, y + radius + 6);
+    ctx.stroke();
+  }
+
+  function drawTrail(result, visibleStep, strokeColor, nodeColor) {
+    const path = result.path;
+    const last = Math.min(visibleStep, path.length - 1);
+    if (last <= 0) {
+      return;
+    }
+
+    const firstPoint = toCanvasPoint(path[0][0], path[0][1]);
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = clamp(firstPoint.cellSize * 0.18, 2, 8);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(firstPoint.x, firstPoint.y);
+    for (let i = 1; i <= last; i += 1) {
+      const point = toCanvasPoint(path[i][0], path[i][1]);
+      ctx.lineTo(point.x, point.y);
+    }
+    ctx.stroke();
+
+    for (let i = 1; i < last; i += 1) {
+      const point = toCanvasPoint(path[i][0], path[i][1]);
+      ctx.fillStyle = nodeColor;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, clamp(point.cellSize * 0.1, 2.5, 6), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawPiece(row, col, options) {
+    const { x, y, cellSize } = toCanvasPoint(row, col);
+    const radius = clamp(cellSize * 0.26, 7, 20);
+    const dx = options.offsetX || 0;
+    const dy = options.offsetY || 0;
+
+    const glow = ctx.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, radius * 3.5);
+    glow.addColorStop(0, options.glow);
+    glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x + dx, y + dy, radius * 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = options.fill;
+    ctx.beginPath();
+    ctx.arc(x + dx, y + dy, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.82)";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(x + dx, y + dy, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(6, 16, 29, 0.9)";
+    ctx.font = `700 ${Math.max(11, Math.round(radius * 0.95))}px "Microsoft YaHei UI"`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(options.label, x + dx, y + dy);
+  }
+
+  function renderStatus() {
+    if (!state.resultA || !state.resultB) {
+      dom.statusBox.textContent = "输入两组坐标后点击“开始演示”，页面会计算最短路径并自动播放。";
+      return;
+    }
+
+    const infoA = getStepInfo(state.resultA, state.currentStep);
+    const infoB = getStepInfo(state.resultB, state.currentStep);
+
+    dom.statusBox.innerHTML = `
+      <strong>黑马 A</strong>：第 ${infoA.step} / ${state.resultA.steps} 步，当前位置 (${infoA.row}, ${infoA.col})，${infoA.reached ? "已经到达目标点" : "本步属于" + infoA.moveText}。<br>
+      <strong>白马 B</strong>：第 ${infoB.step} / ${state.resultB.steps} 步，当前位置 (${infoB.row}, ${infoB.col})，${infoB.reached ? "已经到达目标点" : "本步属于" + infoB.moveText}。<br>
+      <strong>动画总进度</strong>：${state.currentStep} / ${state.totalSteps}。
+    `;
+  }
+
+  function renderRoutes() {
+    if (!state.resultA || !state.resultB) {
+      dom.routePanel.innerHTML = '<div class="notes">还没有生成路径。</div>';
+      return;
+    }
+
+    const buildRouteHTML = (title, result, cls) => {
+      const chips = result.path.map((point, index) => {
+        const stepLabel = index === 0 ? "起点" : `第 ${index} 步 · ${result.moves[index]}`;
+        return `<span class="chip ${cls}">${stepLabel} → (${point[0]}, ${point[1]})</span>`;
+      }).join("");
+
+      return `
+        <div class="route-group">
+          <strong>${title}</strong>
+          <div class="route-chips">${chips}</div>
+        </div>
+      `;
+    };
+
+    dom.routePanel.innerHTML =
+      buildRouteHTML(`黑马 A 路径，共 ${state.resultA.steps} 步`, state.resultA, "a") +
+      buildRouteHTML(`白马 B 路径，共 ${state.resultB.steps} 步`, state.resultB, "b");
+  }
+
+  function renderWinner() {
+    if (!state.resultA || !state.resultB) {
+      dom.winnerBox.textContent = "等待开始演示。";
+      return;
+    }
+
+    if (state.resultA.steps < state.resultB.steps) {
+      dom.winnerBox.innerHTML = `黑马 A 获胜，用时 <strong>${state.resultA.steps}</strong> 步；白马 B 需要 <strong>${state.resultB.steps}</strong> 步。`;
+      return;
+    }
+    if (state.resultB.steps < state.resultA.steps) {
+      dom.winnerBox.innerHTML = `白马 B 获胜，用时 <strong>${state.resultB.steps}</strong> 步；黑马 A 需要 <strong>${state.resultA.steps}</strong> 步。`;
+      return;
+    }
+
+    dom.winnerBox.innerHTML = `平局，两匹棋子都只需要 <strong>${state.resultA.steps}</strong> 步到达目标点。`;
+  }
+
+  function renderBoardText() {
+    dom.progressText.textContent = `${state.currentStep} / ${state.totalSteps}`;
+    dom.viewportText.textContent =
+      `行 ${state.viewport.minRow}-${state.viewport.maxRow}，列 ${state.viewport.minCol}-${state.viewport.maxCol}`;
+  }
+
+  function render() {
+    drawBoardBase();
+    drawTarget();
+
+    if (!state.resultA || !state.resultB) {
+      ctx.fillStyle = "rgba(232, 244, 255, 0.82)";
+      ctx.font = '600 20px "Microsoft YaHei UI"';
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("输入坐标后点击“开始演示”", state.canvasWidth / 2, state.canvasHeight / 2 - 18);
+
+      ctx.fillStyle = "rgba(157, 181, 212, 0.82)";
+      ctx.font = '15px "Microsoft YaHei UI"';
+      ctx.fillText("页面会自动求解最短路径并播放移动过程", state.canvasWidth / 2, state.canvasHeight / 2 + 16);
+      renderBoardText();
+      return;
+    }
+
+    const stepA = Math.min(state.currentStep, state.resultA.path.length - 1);
+    const stepB = Math.min(state.currentStep, state.resultB.path.length - 1);
+
+    drawTrail(state.resultA, stepA, "rgba(76, 224, 179, 0.82)", "rgba(198, 255, 240, 0.7)");
+    drawTrail(state.resultB, stepB, "rgba(255, 127, 127, 0.78)", "rgba(255, 222, 222, 0.72)");
+
+    const posA = state.resultA.path[stepA];
+    const posB = state.resultB.path[stepB];
+    const overlap = posA[0] === posB[0] && posA[1] === posB[1];
+    const offset = overlap ? clamp(toCanvasPoint(posA[0], posA[1]).cellSize * 0.18, 4, 10) : 0;
+
+    drawPiece(state.resultA.path[0][0], state.resultA.path[0][1], {
+      label: "A",
+      fill: "rgba(76, 224, 179, 0.22)",
+      glow: "rgba(76, 224, 179, 0.16)"
+    });
+
+    drawPiece(state.resultB.path[0][0], state.resultB.path[0][1], {
+      label: "B",
+      fill: "rgba(255, 127, 127, 0.22)",
+      glow: "rgba(255, 127, 127, 0.16)"
+    });
+
+    drawPiece(posA[0], posA[1], {
+      label: "A",
+      fill: "#4ce0b3",
+      glow: "rgba(76, 224, 179, 0.34)",
+      offsetX: overlap ? -offset : 0
+    });
+
+    drawPiece(posB[0], posB[1], {
+      label: "B",
+      fill: "#ff7f7f",
+      glow: "rgba(255, 127, 127, 0.34)",
+      offsetX: overlap ? offset : 0
+    });
+
+    renderStatus();
+    renderBoardText();
+  }
+
+  function stopAnimation() {
+    state.playing = false;
+    if (state.timer) {
+      clearTimeout(state.timer);
+      state.timer = null;
+    }
+    dom.playBtn.textContent = "播放";
+  }
+
+  function scheduleNextFrame() {
+    if (!state.playing) {
+      return;
+    }
+    if (state.currentStep >= state.totalSteps) {
+      stopAnimation();
+      dom.footerBar.textContent = "动画播放完成，两枚棋子都已经抵达目标点。";
+      return;
+    }
+
+    state.timer = setTimeout(() => {
+      state.currentStep += 1;
+      render();
+      scheduleNextFrame();
+    }, getDelay());
+  }
+
+  function startAnimation() {
+    if (!state.resultA || !state.resultB) {
+      return;
+    }
+    if (state.currentStep >= state.totalSteps) {
+      state.currentStep = 0;
+    }
+    state.playing = true;
+    dom.playBtn.textContent = "暂停";
+    scheduleNextFrame();
+  }
+
+  function togglePlay() {
+    if (!state.resultA || !state.resultB) {
+      return;
+    }
+    if (state.playing) {
+      stopAnimation();
+    } else {
+      startAnimation();
+    }
+  }
+
+  function resetAnimation() {
+    stopAnimation();
+    state.currentStep = 0;
+    render();
+    dom.footerBar.textContent = "动画已重置，可以重新播放最短路径。";
+  }
+
+  function clearAll() {
+    stopAnimation();
+    state.resultA = null;
+    state.resultB = null;
+    state.currentStep = 0;
+    state.totalSteps = 0;
+    state.viewport = { minRow: 1, maxRow: 20, minCol: 1, maxCol: 20 };
+    dom.resultA.textContent = "-";
+    dom.resultB.textContent = "-";
+    dom.boardSummary.textContent = "显示窗口会自动聚焦到两条最短路径和目标点，便于观察整段移动过程。";
+    renderWinner();
+    renderRoutes();
+    renderStatus();
+    render();
+    dom.footerBar.textContent = "结果已清空，重新输入坐标后可以再次演示。";
+  }
+
+  function updateSpeedLabel() {
+    state.speed = Number(dom.speedSlider.value);
+    dom.speedLabel.textContent = SPEED_LABELS[state.speed];
+  }
+
+  function loadSample() {
+    dom.ax.value = 12;
+    dom.ay.value = 16;
+    dom.bx.value = 18;
+    dom.by.value = 10;
+    dom.footerBar.textContent = "已载入题目样例坐标。";
+  }
+
+  function beginDemo() {
+    const ax = Number(dom.ax.value);
+    const ay = Number(dom.ay.value);
+    const bx = Number(dom.bx.value);
+    const by = Number(dom.by.value);
+
+    if (![ax, ay, bx, by].every(validateCoordinate)) {
+      window.alert("请输入 1 到 100 之间的整数坐标。");
+      return;
+    }
+
+    const resultA = bfs(ax, ay);
+    const resultB = bfs(bx, by);
+
+    if (!resultA || !resultB) {
+      window.alert("路径计算失败，请检查输入。");
+      return;
+    }
+
+    stopAnimation();
+
+    state.resultA = resultA;
+    state.resultB = resultB;
+    state.currentStep = 0;
+    state.totalSteps = Math.max(resultA.steps, resultB.steps);
+    state.viewport = buildViewport(resultA.path, resultB.path);
+
+    dom.resultA.textContent = String(resultA.steps);
+    dom.resultB.textContent = String(resultB.steps);
+    dom.boardSummary.textContent =
+      `当前演示使用自动聚焦窗口，黑马 A 需要 ${resultA.steps} 步，白马 B 需要 ${resultB.steps} 步。`;
+
+    renderWinner();
+    renderRoutes();
+    renderStatus();
+    render();
+
+    dom.footerBar.textContent = "最短路径计算完成，动画开始播放。";
+    startAnimation();
+  }
+
+  function stepForward() {
+    if (!state.resultA || !state.resultB) {
+      return;
+    }
+    stopAnimation();
+    if (state.currentStep < state.totalSteps) {
+      state.currentStep += 1;
+      render();
+    }
+    dom.footerBar.textContent = "已手动前进一步。";
+  }
+
+  function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    state.canvasWidth = rect.width;
+    state.canvasHeight = rect.height;
+    render();
+  }
+
+  document.getElementById("startBtn").addEventListener("click", beginDemo);
+  document.getElementById("sampleBtn").addEventListener("click", loadSample);
+  document.getElementById("playBtn").addEventListener("click", togglePlay);
+  document.getElementById("stepBtn").addEventListener("click", stepForward);
+  document.getElementById("resetBtn").addEventListener("click", resetAnimation);
+  document.getElementById("clearBtn").addEventListener("click", clearAll);
+  dom.speedSlider.addEventListener("input", updateSpeedLabel);
+  window.addEventListener("resize", resizeCanvas);
+
+  updateSpeedLabel();
+  renderWinner();
+  renderRoutes();
+  resizeCanvas();
+</script>
+</body>
+</html>

@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TSP 分支限界法可视化</title>
+<style>
+  :root {
+    --bg: #f4efe6;
+    --paper: #fffaf1;
+    --ink: #173126;
+    --muted: #6a756f;
+    --line: #d9cfbf;
+    --accent: #d86f45;
+    --accent-soft: rgba(216, 111, 69, 0.14);
+    --green: #2c8c69;
+    --green-soft: rgba(44, 140, 105, 0.12);
+    --gold: #b78b34;
+    --red: #c55454;
+    --shadow: 0 18px 42px rgba(37, 40, 31, 0.12);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    font-family: "MiSans", "HarmonyOS Sans SC", "Microsoft YaHei UI", sans-serif;
+    overflow-x: hidden;
+    background:
+      radial-gradient(circle at top right, rgba(216, 111, 69, 0.12), transparent 24%),
+      radial-gradient(circle at left center, rgba(44, 140, 105, 0.12), transparent 18%),
+      linear-gradient(180deg, #f7f2e8, #efe7d9);
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(23, 49, 38, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(23, 49, 38, 0.03) 1px, transparent 1px);
+    background-size: 24px 24px;
+    opacity: 0.55;
+  }
+
+  .page {
+    max-width: 1480px;
+    margin: 0 auto;
+    padding: 24px 18px 30px;
+  }
+
+  .hero {
+    margin-bottom: 18px;
+  }
+
+  .eyebrow {
+    font-size: 0.86rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    margin: 0 0 10px;
+    font-size: clamp(2rem, 3.2vw, 3.4rem);
+    line-height: 1.06;
+  }
+
+  .hero p {
+    margin: 0;
+    max-width: 980px;
+    color: var(--muted);
+    line-height: 1.78;
+    font-size: 1rem;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 410px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .panel {
+    background: rgba(255, 250, 241, 0.92);
+    border: 1px solid rgba(23, 49, 38, 0.09);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+    min-width: 0;
+  }
+
+  .sidebar {
+    display: grid;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  .section {
+    padding: 18px;
+  }
+
+  .section h2 {
+    margin: 0 0 12px;
+    font-size: 1.04rem;
+  }
+
+  .section p,
+  .section li,
+  .section div {
+    line-height: 1.72;
+  }
+
+  .section-subtitle {
+    color: var(--muted);
+    font-size: 0.92rem;
+    margin: -2px 0 12px;
+  }
+
+  .form-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  .row-2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  label {
+    display: grid;
+    gap: 6px;
+    font-size: 0.92rem;
+    color: var(--muted);
+  }
+
+  input[type="number"],
+  input[type="range"],
+  textarea {
+    width: 100%;
+  }
+
+  input[type="number"],
+  textarea {
+    border: 1px solid rgba(23, 49, 38, 0.14);
+    background: rgba(255, 255, 255, 0.88);
+    border-radius: 14px;
+    padding: 11px 12px;
+    font-size: 0.98rem;
+    color: var(--ink);
+    outline: none;
+  }
+
+  input[type="number"]:focus,
+  textarea:focus {
+    border-color: rgba(216, 111, 69, 0.58);
+    box-shadow: 0 0 0 4px rgba(216, 111, 69, 0.12);
+  }
+
+  input[type="range"] {
+    accent-color: var(--accent);
+  }
+
+  button {
+    border: 0;
+    border-radius: 15px;
+    padding: 11px 14px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  button:hover {
+    transform: translateY(-1px);
+  }
+
+  .primary {
+    background: linear-gradient(135deg, #e18a62, #d86f45);
+    color: white;
+    box-shadow: 0 12px 24px rgba(216, 111, 69, 0.24);
+  }
+
+  .secondary {
+    background: linear-gradient(135deg, #3fa07b, #2c8c69);
+    color: white;
+    box-shadow: 0 12px 24px rgba(44, 140, 105, 0.2);
+  }
+
+  .ghost {
+    background: rgba(23, 49, 38, 0.06);
+    color: var(--ink);
+    border: 1px solid rgba(23, 49, 38, 0.1);
+  }
+
+  .button-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .matrix-wrap {
+    overflow: auto;
+    max-height: 360px;
+    border: 1px solid rgba(23, 49, 38, 0.08);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.76);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    padding: 8px;
+    border-bottom: 1px solid rgba(23, 49, 38, 0.06);
+    border-right: 1px solid rgba(23, 49, 38, 0.06);
+    text-align: center;
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    background: #f7f1e6;
+    z-index: 1;
+    font-size: 0.9rem;
+  }
+
+  td input {
+    min-width: 70px;
+    text-align: center;
+  }
+
+  td input[disabled] {
+    background: #f3ede2;
+    color: var(--muted);
+    font-weight: 700;
+  }
+
+  .main {
+    display: grid;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .stat {
+    background: rgba(255, 255, 255, 0.68);
+    border: 1px solid rgba(23, 49, 38, 0.08);
+    border-radius: 18px;
+    padding: 14px;
+  }
+
+  .stat small {
+    display: block;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .stat strong {
+    display: block;
+    font-size: 1.62rem;
+    line-height: 1.05;
+  }
+
+  .board-panel {
+    padding: 18px;
+    display: grid;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  .board-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .board-top h2 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+
+  .board-top p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    line-height: 1.72;
+  }
+
+  .pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .pill {
+    padding: 9px 12px;
+    border-radius: 999px;
+    background: rgba(23, 49, 38, 0.06);
+    border: 1px solid rgba(23, 49, 38, 0.09);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .pill strong {
+    color: var(--ink);
+  }
+
+  .canvas-shell {
+    border-radius: 24px;
+    padding: 16px;
+    background:
+      radial-gradient(circle at top, rgba(216, 111, 69, 0.12), transparent 24%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(247, 241, 230, 0.98));
+    border: 1px solid rgba(23, 49, 38, 0.08);
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  svg {
+    width: 100%;
+    height: min(68vh, 760px);
+    display: block;
+    border-radius: 18px;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(250, 245, 237, 0.94));
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: 14px;
+    min-width: 0;
+  }
+
+  .info-card {
+    padding: 16px;
+    border-radius: 20px;
+    border: 1px solid rgba(23, 49, 38, 0.08);
+    background: rgba(255, 255, 255, 0.7);
+    min-height: 180px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .info-card h3 {
+    margin: 0 0 10px;
+    font-size: 1rem;
+  }
+
+  .description-box {
+    color: var(--ink);
+    line-height: 1.78;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .mini-list {
+    display: grid;
+    gap: 8px;
+    max-height: 280px;
+    overflow: auto;
+    padding-right: 4px;
+  }
+
+  .mini-item {
+    border-radius: 14px;
+    padding: 10px 12px;
+    background: rgba(23, 49, 38, 0.05);
+    font-size: 0.9rem;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .mini-item.keep {
+    border-left: 4px solid var(--green);
+    background: var(--green-soft);
+  }
+
+  .mini-item.prune {
+    border-left: 4px solid var(--red);
+    background: rgba(197, 84, 84, 0.1);
+  }
+
+  .mini-item.neutral {
+    border-left: 4px solid var(--gold);
+    background: rgba(183, 139, 52, 0.11);
+  }
+
+  pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 0.88rem;
+    line-height: 1.7;
+    color: var(--ink);
+  }
+
+  .notes {
+    display: grid;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+
+  .notes strong {
+    color: var(--ink);
+  }
+
+  @media (max-width: 1200px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+
+    .stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 760px) {
+    .page {
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+
+    .button-grid,
+    .row-2,
+    .stats,
+    .info-grid {
+      grid-template-columns: 1fr;
+    }
+
+    svg {
+      height: 420px;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div class="eyebrow">Traveling Salesman Problem / Branch and Bound</div>
+      <h1>TSP 分支限界法可视化网页</h1>
+      <p>
+        这个页面会把城市代价矩阵转成图结构，用分支限界法搜索最短回路，并把“当前扩展结点、剪枝情况、活结点队列、当前上界和最优回路”
+        动态展示出来。页面中的矩阵输入格式与控制台程序保持一致，其中 <strong>100</strong> 表示没有直接边。
+      </p>
+    </section>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <section class="panel section">
+          <h2>基础控制</h2>
+          <p class="section-subtitle">城市数建议控制在 4 到 8 之间，动画更清楚，搜索帧也不会过多。</p>
+          <div class="form-grid">
+            <div class="row-2">
+              <label>城市数量
+                <input id="cityCount" type="number" min="4" max="8" value="5">
+              </label>
+              <label>播放速度
+                <input id="speedRange" type="range" min="1" max="10" value="5">
+              </label>
+            </div>
+
+            <div class="button-grid">
+              <button class="ghost" id="buildMatrixBtn">生成矩阵</button>
+              <button class="secondary" id="loadSampleBtn">载入样例</button>
+            </div>
+
+            <div class="button-grid">
+              <button class="primary" id="solveBtn">开始求解</button>
+              <button class="ghost" id="resetBtn">重置动画</button>
+            </div>
+
+            <div class="button-grid">
+              <button class="ghost" id="playBtn">播放</button>
+              <button class="ghost" id="stepBtn">单步前进</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel section">
+          <h2>矩阵输入</h2>
+          <p class="section-subtitle">主对角线固定为 0；非对角线填正整数，填 100 表示两城市之间没有直接边。</p>
+          <div class="matrix-wrap">
+            <table id="matrixTable"></table>
+          </div>
+        </section>
+
+        <section class="panel section">
+          <h2>控制台输入预览</h2>
+          <p class="section-subtitle">这一段可以直接复制到 `tsp_bb.exe` 的终端输入里测试。</p>
+          <pre id="terminalPreview"></pre>
+        </section>
+
+        <section class="panel section">
+          <h2>规则与说明</h2>
+          <div class="notes">
+            <div><strong>起点：</strong>默认从城市 0 出发，最终回到城市 0。</div>
+            <div><strong>上界：</strong>页面先用贪心法找到一个初始可行回路，作为当前最优上界。</div>
+            <div><strong>下界：</strong>对每个结点估算“当前路径代价 + 未来至少还要付出的代价”。</div>
+            <div><strong>剪枝：</strong>若结点下界已经大于当前最优上界，就不再继续扩展。</div>
+          </div>
+        </section>
+      </aside>
+
+      <main class="main">
+        <section class="panel board-panel">
+          <div class="board-top">
+            <div>
+              <h2>搜索图形视图</h2>
+              <p id="boardSummary">绿色闭环表示当前已知最优回路，橙色折线表示当前正在处理的结点路径，灰线是城市图的背景连线。</p>
+            </div>
+            <div class="pill-row">
+              <div class="pill"><strong id="frameCounter">0 / 0</strong> 搜索帧</div>
+              <div class="pill"><strong id="speedLabel">中速</strong> 动画节奏</div>
+              <div class="pill"><strong id="frontierCount">0</strong> 活结点</div>
+            </div>
+          </div>
+
+          <div class="stats">
+            <div class="stat">
+              <small>当前最优代价</small>
+              <strong id="bestCostValue">-</strong>
+            </div>
+            <div class="stat">
+              <small>已扩展结点数</small>
+              <strong id="expandedValue">-</strong>
+            </div>
+            <div class="stat">
+              <small>当前结点下界</small>
+              <strong id="lbValue">-</strong>
+            </div>
+            <div class="stat">
+              <small>当前路径代价</small>
+              <strong id="costValue">-</strong>
+            </div>
+          </div>
+
+          <div class="canvas-shell">
+            <svg id="graphSvg" viewBox="0 0 900 680" aria-label="TSP 图形区域"></svg>
+          </div>
+        </section>
+
+        <div class="info-grid">
+          <section class="panel info-card">
+            <h3>当前帧说明</h3>
+            <div class="description-box" id="frameDescription">点击“开始求解”后，这里会显示每一步的扩展与剪枝说明。</div>
+          </section>
+
+          <section class="panel info-card">
+            <h3>当前最优回路</h3>
+            <div class="description-box" id="bestPathBox">尚未计算。</div>
+          </section>
+        </div>
+
+        <div class="info-grid">
+          <section class="panel info-card">
+            <h3>子结点处理结果</h3>
+            <div class="mini-list" id="childList">
+              <div class="mini-item neutral">还没有生成搜索帧。</div>
+            </div>
+          </section>
+
+          <section class="panel info-card">
+            <h3>活结点队列预览</h3>
+            <div class="mini-list" id="frontierList">
+              <div class="mini-item neutral">求解后会显示按下界排序的前几个活结点。</div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+
+<script>
+  "use strict";
+
+  const INF = 10000000;
+  const SPEED_LABELS = ["", "Very Slow", "Slow", "Mild", "Mid Slow", "Medium", "Mid Fast", "Fast", "Quick", "Very Fast", "Ultra"];
+
+  const sampleMatrix = [
+    [0, 12, 10, 19, 8],
+    [12, 0, 3, 7, 2],
+    [10, 3, 0, 6, 20],
+    [19, 7, 6, 0, 4],
+    [8, 2, 20, 4, 0]
+  ];
+
+  const state = {
+    matrix: [],
+    frames: [],
+    currentFrameIndex: 0,
+    timer: null,
+    playing: false,
+    speed: 5,
+    result: null
+  };
+
+  const dom = {
+    cityCount: document.getElementById("cityCount"),
+    speedRange: document.getElementById("speedRange"),
+    speedLabel: document.getElementById("speedLabel"),
+    matrixTable: document.getElementById("matrixTable"),
+    terminalPreview: document.getElementById("terminalPreview"),
+    graphSvg: document.getElementById("graphSvg"),
+    frameCounter: document.getElementById("frameCounter"),
+    frontierCount: document.getElementById("frontierCount"),
+    bestCostValue: document.getElementById("bestCostValue"),
+    expandedValue: document.getElementById("expandedValue"),
+    lbValue: document.getElementById("lbValue"),
+    costValue: document.getElementById("costValue"),
+    frameDescription: document.getElementById("frameDescription"),
+    bestPathBox: document.getElementById("bestPathBox"),
+    childList: document.getElementById("childList"),
+    frontierList: document.getElementById("frontierList"),
+    boardSummary: document.getElementById("boardSummary"),
+    playBtn: document.getElementById("playBtn")
+  };
+
+  function cloneArrayPath(path) {
+    return path ? [...path] : [];
+  }
+
+  function pathText(path) {
+    if (!path || !path.length) {
+      return "-";
+    }
+    return path.join(" -> ");
+  }
+
+  function buildEditableMatrix(size) {
+    dom.matrixTable.innerHTML = "";
+
+    const header = document.createElement("tr");
+    header.appendChild(document.createElement("th"));
+    for (let col = 0; col < size; col += 1) {
+      const th = document.createElement("th");
+      th.textContent = `To ${col}`;
+      header.appendChild(th);
+    }
+    dom.matrixTable.appendChild(header);
+
+    for (let row = 0; row < size; row += 1) {
+      const tr = document.createElement("tr");
+      const th = document.createElement("th");
+      th.textContent = `From ${row}`;
+      tr.appendChild(th);
+
+      for (let col = 0; col < size; col += 1) {
+        const td = document.createElement("td");
+        const input = document.createElement("input");
+        input.type = "number";
+        input.min = "0";
+        input.step = "1";
+        input.dataset.row = String(row);
+        input.dataset.col = String(col);
+
+        if (row === col) {
+          input.value = "0";
+          input.disabled = true;
+        } else {
+          input.value = "100";
+        }
+
+        input.addEventListener("input", syncMatrixFromInputs);
+        td.appendChild(input);
+        tr.appendChild(td);
+      }
+
+      dom.matrixTable.appendChild(tr);
+    }
+
+    syncMatrixFromInputs();
+  }
+
+  function fillMatrix(matrix) {
+    dom.cityCount.value = String(matrix.length);
+    buildEditableMatrix(matrix.length);
+
+    const inputs = dom.matrixTable.querySelectorAll("input");
+    inputs.forEach((input) => {
+      const row = Number(input.dataset.row);
+      const col = Number(input.dataset.col);
+      input.value = String(matrix[row][col]);
+    });
+
+    syncMatrixFromInputs();
+  }
+
+  function syncMatrixFromInputs() {
+    const size = Number(dom.cityCount.value);
+    const matrix = Array.from({ length: size }, () => Array(size).fill(0));
+    const inputs = dom.matrixTable.querySelectorAll("input");
+
+    for (const input of inputs) {
+      const row = Number(input.dataset.row);
+      const col = Number(input.dataset.col);
+      matrix[row][col] = Number(input.value || 0);
+    }
+
+    state.matrix = matrix;
+    updateTerminalPreview();
+  }
+
+  function updateTerminalPreview() {
+    const lines = [String(state.matrix.length)];
+    for (const row of state.matrix) {
+      lines.push(row.join(" "));
+    }
+    dom.terminalPreview.textContent = lines.join("\n");
+  }
+
+  function readMatrix() {
+    syncMatrixFromInputs();
+    const size = state.matrix.length;
+    const matrix = Array.from({ length: size }, () => Array(size).fill(INF));
+
+    for (let i = 0; i < size; i += 1) {
+      for (let j = 0; j < size; j += 1) {
+        const value = state.matrix[i][j];
+        if (!Number.isFinite(value) || value < 0) {
+          throw new Error(`Row ${i}, column ${j} is not a valid non-negative integer.`);
+        }
+        if (i === j) {
+          matrix[i][j] = INF;
+        } else if (value === 100) {
+          matrix[i][j] = INF;
+        } else {
+          matrix[i][j] = value;
+        }
+      }
+    }
+
+    return matrix;
+  }
+
+  function calcLowerBound(path, visited, currentCost, matrix) {
+    const n = matrix.length;
+    const lastCity = path[path.length - 1];
+    let bound = currentCost;
+
+    if (path.length === n) {
+      return bound + matrix[lastCity][0];
+    }
+
+    let minLeave = INF;
+    for (let city = 0; city < n; city += 1) {
+      if (!visited[city]) {
+        minLeave = Math.min(minLeave, matrix[lastCity][city]);
+      }
+    }
+    bound += minLeave;
+
+    for (let city = 0; city < n; city += 1) {
+      if (!visited[city]) {
+        let minOut = INF;
+        for (let next = 0; next < n; next += 1) {
+          if (next !== city && (!visited[next] || next === 0)) {
+            minOut = Math.min(minOut, matrix[city][next]);
+          }
+        }
+        bound += minOut;
+      }
+    }
+
+    return bound;
+  }
+
+  function greedyUpperBound(matrix) {
+    const n = matrix.length;
+    const visited = Array(n).fill(false);
+    const path = [0];
+    let current = 0;
+    let total = 0;
+    visited[0] = true;
+
+    for (let step = 1; step < n; step += 1) {
+      let nextCity = -1;
+      let bestEdge = INF;
+      for (let city = 0; city < n; city += 1) {
+        if (!visited[city] && matrix[current][city] < bestEdge) {
+          bestEdge = matrix[current][city];
+          nextCity = city;
+        }
+      }
+
+      if (nextCity === -1 || bestEdge >= INF) {
+        return null;
+      }
+
+      total += bestEdge;
+      visited[nextCity] = true;
+      path.push(nextCity);
+      current = nextCity;
+    }
+
+    if (matrix[current][0] >= INF) {
+      return null;
+    }
+
+    total += matrix[current][0];
+    path.push(0);
+    return { cost: total, path };
+  }
+
+  function snapshotFrontier(queue) {
+    return [...queue]
+      .sort((a, b) => a.lowerBound - b.lowerBound || a.path.length - b.path.length)
+      .slice(0, 6)
+      .map((node) => ({
+        path: cloneArrayPath(node.path),
+        cost: node.cost,
+        lowerBound: node.lowerBound
+      }));
+  }
+
+  function createFrame(data) {
+    return {
+      type: data.type,
+      description: data.description,
+      currentPath: cloneArrayPath(data.currentPath),
+      currentCost: data.currentCost ?? null,
+      currentLB: data.currentLB ?? null,
+      bestCost: data.bestCost ?? null,
+      bestPath: cloneArrayPath(data.bestPath),
+      frontier: data.frontier ? data.frontier.map((item) => ({
+        path: cloneArrayPath(item.path),
+        cost: item.cost,
+        lowerBound: item.lowerBound
+      })) : [],
+      children: data.children ? data.children.map((item) => ({
+        path: cloneArrayPath(item.path),
+        cost: item.cost,
+        lowerBound: item.lowerBound,
+        status: item.status,
+        reason: item.reason
+      })) : [],
+      expandedNodes: data.expandedNodes ?? 0
+    };
+  }
+
+  function solveBranchAndBound(matrix) {
+    const n = matrix.length;
+    const frames = [];
+    let bestCost = INF;
+    let bestPath = [];
+    let expandedNodes = 0;
+
+    const greedy = greedyUpperBound(matrix);
+    if (greedy) {
+      bestCost = greedy.cost;
+      bestPath = greedy.path;
+      frames.push(createFrame({
+        type: "greedy",
+        description: `Greedy initialization gives the first upper bound ${bestCost}, with tour ${pathText(bestPath)}.`,
+        currentPath: greedy.path,
+        currentCost: greedy.cost,
+        currentLB: greedy.cost,
+        bestCost,
+        bestPath,
+        frontier: [],
+        children: [],
+        expandedNodes
+      }));
+    } else {
+      frames.push(createFrame({
+        type: "greedy",
+        description: "Greedy initialization did not find a feasible tour, so the search relies fully on branch and bound.",
+        currentPath: [0],
+        currentCost: 0,
+        currentLB: null,
+        bestCost: null,
+        bestPath: [],
+        frontier: [],
+        children: [],
+        expandedNodes
+      }));
+    }
+
+    const root = {
+      path: [0],
+      visited: Array(n).fill(false),
+      cost: 0,
+      lowerBound: 0
+    };
+    root.visited[0] = true;
+    root.lowerBound = calcLowerBound(root.path, root.visited, 0, matrix);
+
+    const queue = [root];
+
+    frames.push(createFrame({
+      type: "root",
+      description: `Create the root node. Current path is 0 and the root lower bound is ${root.lowerBound}.`,
+      currentPath: root.path,
+      currentCost: 0,
+      currentLB: root.lowerBound,
+      bestCost: bestCost >= INF ? null : bestCost,
+      bestPath,
+      frontier: snapshotFrontier(queue),
+      children: [],
+      expandedNodes
+    }));
+
+    while (queue.length > 0) {
+      queue.sort((a, b) => a.lowerBound - b.lowerBound || a.path.length - b.path.length);
+      const current = queue.shift();
+      const lastCity = current.path[current.path.length - 1];
+
+      if (current.lowerBound > bestCost) {
+        frames.push(createFrame({
+          type: "prune",
+          description: `Pop path ${pathText(current.path)}. Its lower bound ${current.lowerBound} is already above the best upper bound ${bestCost}, so it is pruned.`,
+          currentPath: current.path,
+          currentCost: current.cost,
+          currentLB: current.lowerBound,
+          bestCost,
+          bestPath,
+          frontier: snapshotFrontier(queue),
+          children: [],
+          expandedNodes
+        }));
+        continue;
+      }
+
+      if (current.path.length === n) {
+        if (matrix[lastCity][0] < INF) {
+          const total = current.cost + matrix[lastCity][0];
+          const tour = [...current.path, 0];
+          if (total <= bestCost) {
+            bestCost = total;
+            bestPath = tour;
+            frames.push(createFrame({
+              type: "best",
+              description: `A complete tour ${pathText(tour)} is found with total cost ${total}. Update the best solution.`,
+              currentPath: tour,
+              currentCost: total,
+              currentLB: current.lowerBound,
+              bestCost,
+              bestPath,
+              frontier: snapshotFrontier(queue),
+              children: [],
+              expandedNodes
+            }));
+          } else {
+            frames.push(createFrame({
+              type: "leaf",
+              description: `A complete tour ${pathText(tour)} is found with total cost ${total}, but it does not improve the current best ${bestCost}.`,
+              currentPath: tour,
+              currentCost: total,
+              currentLB: current.lowerBound,
+              bestCost,
+              bestPath,
+              frontier: snapshotFrontier(queue),
+              children: [],
+              expandedNodes
+            }));
+          }
+        } else {
+          frames.push(createFrame({
+            type: "leaf",
+            description: `Path ${pathText(current.path)} visits all cities, but it cannot return to city 0, so it is not a feasible tour.`,
+            currentPath: current.path,
+            currentCost: current.cost,
+            currentLB: current.lowerBound,
+            bestCost: bestCost >= INF ? null : bestCost,
+            bestPath,
+            frontier: snapshotFrontier(queue),
+            children: [],
+            expandedNodes
+          }));
+        }
+        continue;
+      }
+
+      expandedNodes += 1;
+      const children = [];
+
+      for (let nextCity = 0; nextCity < n; nextCity += 1) {
+        if (!current.visited[nextCity] && matrix[lastCity][nextCity] < INF) {
+          const visited = [...current.visited];
+          visited[nextCity] = true;
+          const nextPath = [...current.path, nextCity];
+          const nextCost = current.cost + matrix[lastCity][nextCity];
+          const nextLB = calcLowerBound(nextPath, visited, nextCost, matrix);
+
+          if (nextLB <= bestCost) {
+            queue.push({
+              path: nextPath,
+              visited,
+              cost: nextCost,
+              lowerBound: nextLB
+            });
+            children.push({
+              path: nextPath,
+              cost: nextCost,
+              lowerBound: nextLB,
+              status: "keep",
+              reason: `Keep it: lower bound ${nextLB} does not exceed the current upper bound ${bestCost}.`
+            });
+          } else {
+            children.push({
+              path: nextPath,
+              cost: nextCost,
+              lowerBound: nextLB,
+              status: "prune",
+              reason: `Prune it: lower bound ${nextLB} is already above the current upper bound ${bestCost}.`
+            });
+          }
+        }
+      }
+
+      frames.push(createFrame({
+        type: "expand",
+        description: `Expand path ${pathText(current.path)}. Current cost is ${current.cost}, lower bound is ${current.lowerBound}, and this step generates ${children.length} child nodes.`,
+        currentPath: current.path,
+        currentCost: current.cost,
+        currentLB: current.lowerBound,
+        bestCost: bestCost >= INF ? null : bestCost,
+        bestPath,
+        frontier: snapshotFrontier(queue),
+        children,
+        expandedNodes
+      }));
+    }
+
+    frames.push(createFrame({
+      type: "finish",
+      description: bestCost >= INF
+        ? "Search finished, but no feasible Hamiltonian tour was found."
+        : `Search finished. The best tour is ${pathText(bestPath)} with total cost ${bestCost}.`,
+      currentPath: bestPath,
+      currentCost: bestCost >= INF ? null : bestCost,
+      currentLB: null,
+      bestCost: bestCost >= INF ? null : bestCost,
+      bestPath,
+      frontier: [],
+      children: [],
+      expandedNodes
+    }));
+
+    return {
+      bestCost: bestCost >= INF ? null : bestCost,
+      bestPath,
+      expandedNodes,
+      frames
+    };
+  }
+
+  function getDelay() {
+    return Math.max(120, 980 - (state.speed - 1) * 90);
+  }
+
+  function cityPositions(n) {
+    const centerX = 450;
+    const centerY = 340;
+    const radius = Math.min(240, 90 + n * 18);
+    return Array.from({ length: n }, (_, index) => {
+      const angle = (-Math.PI / 2) + (index * 2 * Math.PI / n);
+      return {
+        x: centerX + Math.cos(angle) * radius,
+        y: centerY + Math.sin(angle) * radius
+      };
+    });
+  }
+
+  function line(x1, y1, x2, y2, options = {}) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    el.setAttribute("x1", x1);
+    el.setAttribute("y1", y1);
+    el.setAttribute("x2", x2);
+    el.setAttribute("y2", y2);
+    el.setAttribute("stroke", options.stroke || "#d9cfbf");
+    el.setAttribute("stroke-width", options.width || "2");
+    if (options.dash) {
+      el.setAttribute("stroke-dasharray", options.dash);
+    }
+    el.setAttribute("opacity", options.opacity || "1");
+    return el;
+  }
+
+  function circle(cx, cy, r, fill, stroke, width) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    el.setAttribute("cx", cx);
+    el.setAttribute("cy", cy);
+    el.setAttribute("r", r);
+    el.setAttribute("fill", fill);
+    el.setAttribute("stroke", stroke);
+    el.setAttribute("stroke-width", width);
+    return el;
+  }
+
+  function text(x, y, content, options = {}) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    el.setAttribute("x", x);
+    el.setAttribute("y", y);
+    el.setAttribute("text-anchor", options.anchor || "middle");
+    el.setAttribute("dominant-baseline", options.baseline || "middle");
+    el.setAttribute("font-size", options.size || "16");
+    el.setAttribute("font-weight", options.weight || "700");
+    el.setAttribute("fill", options.fill || "#173126");
+    el.textContent = content;
+    return el;
+  }
+
+  function drawPath(svg, points, path, options = {}) {
+    if (!path || path.length < 2) {
+      return;
+    }
+
+    for (let i = 0; i < path.length - 1; i += 1) {
+      const from = points[path[i]];
+      const to = points[path[i + 1]];
+      svg.appendChild(line(from.x, from.y, to.x, to.y, {
+        stroke: options.stroke,
+        width: options.width,
+        dash: options.dash,
+        opacity: options.opacity
+      }));
+    }
+  }
+
+  function renderGraph() {
+    dom.graphSvg.innerHTML = "";
+
+    const size = state.matrix.length;
+    if (!size) {
+      return;
+    }
+
+    const points = cityPositions(size);
+    const frame = state.frames[state.currentFrameIndex];
+    const graphMatrix = readMatrix();
+
+    for (let i = 0; i < size; i += 1) {
+      for (let j = i + 1; j < size; j += 1) {
+        if (graphMatrix[i][j] < INF || graphMatrix[j][i] < INF) {
+          dom.graphSvg.appendChild(line(points[i].x, points[i].y, points[j].x, points[j].y, {
+            stroke: "#ddd0bd",
+            width: 1.6,
+            opacity: 0.8
+          }));
+        }
+      }
+    }
+
+    if (frame && frame.bestPath && frame.bestPath.length > 1) {
+      drawPath(dom.graphSvg, points, frame.bestPath, {
+        stroke: "#2c8c69",
+        width: 7,
+        opacity: 0.95
+      });
+    }
+
+    if (frame && frame.currentPath && frame.currentPath.length > 1) {
+      drawPath(dom.graphSvg, points, frame.currentPath, {
+        stroke: "#d86f45",
+        width: 5,
+        dash: frame.type === "prune" ? "10 8" : "",
+        opacity: 0.95
+      });
+    }
+
+    const visitedSet = new Set(frame ? frame.currentPath : []);
+
+    points.forEach((point, index) => {
+      const isVisited = visitedSet.has(index);
+      const isStart = index === 0;
+      const fill = isStart ? "#f3d38b" : isVisited ? "#ffd9cb" : "#ffffff";
+      const stroke = isStart ? "#b78b34" : isVisited ? "#d86f45" : "#173126";
+
+      dom.graphSvg.appendChild(circle(point.x, point.y, isStart ? 26 : 22, fill, stroke, isStart ? 4 : 3));
+      dom.graphSvg.appendChild(text(point.x, point.y, String(index), {
+        size: isStart ? "18" : "16",
+        fill: "#173126",
+        weight: "800"
+      }));
+    });
+  }
+
+  function renderChildList(frame) {
+    if (!frame || !frame.children.length) {
+      dom.childList.innerHTML = '<div class="mini-item neutral">No child-node details in this frame.</div>';
+      return;
+    }
+
+    dom.childList.innerHTML = frame.children.map((child) => `
+      <div class="mini-item ${child.status}">
+        <strong>${child.status === "keep" ? "Keep" : "Prune"}</strong><br>
+        Path: ${pathText(child.path)}<br>
+        Cost: ${child.cost}, LB: ${child.lowerBound}<br>
+        ${child.reason}
+      </div>
+    `).join("");
+  }
+
+  function renderFrontierList(frame) {
+    if (!frame || !frame.frontier.length) {
+      dom.frontierList.innerHTML = '<div class="mini-item neutral">No active node remains, or the search has finished.</div>';
+      return;
+    }
+
+    dom.frontierList.innerHTML = frame.frontier.map((node, index) => `
+      <div class="mini-item neutral">
+        <strong>Queue rank ${index + 1}</strong><br>
+        Path: ${pathText(node.path)}<br>
+        Cost: ${node.cost}, LB: ${node.lowerBound}
+      </div>
+    `).join("");
+  }
+
+  function renderFrame() {
+    const totalFrames = state.frames.length;
+    const frame = state.frames[state.currentFrameIndex];
+
+    dom.frameCounter.textContent = totalFrames ? `${state.currentFrameIndex + 1} / ${totalFrames}` : "0 / 0";
+    dom.speedLabel.textContent = SPEED_LABELS[state.speed];
+    dom.frontierCount.textContent = frame ? String(frame.frontier.length) : "0";
+    dom.bestCostValue.textContent = frame && frame.bestCost != null ? String(frame.bestCost) : "-";
+    dom.expandedValue.textContent = frame ? String(frame.expandedNodes) : "-";
+    dom.lbValue.textContent = frame && frame.currentLB != null && frame.currentLB < INF ? String(frame.currentLB) : "-";
+    dom.costValue.textContent = frame && frame.currentCost != null && frame.currentCost < INF ? String(frame.currentCost) : "-";
+    dom.frameDescription.textContent = frame ? frame.description : "Click Solve to display expansion and pruning details frame by frame.";
+    dom.bestPathBox.textContent = frame && frame.bestPath && frame.bestPath.length
+      ? `${pathText(frame.bestPath)} | Cost: ${frame.bestCost}`
+      : "Not solved yet.";
+
+    renderChildList(frame);
+    renderFrontierList(frame);
+    renderGraph();
+  }
+
+  function stopPlayback() {
+    state.playing = false;
+    dom.playBtn.textContent = "Play";
+    if (state.timer) {
+      clearTimeout(state.timer);
+      state.timer = null;
+    }
+  }
+
+  function stepPlayback() {
+    if (!state.frames.length) {
+      return;
+    }
+
+    if (state.currentFrameIndex >= state.frames.length - 1) {
+      stopPlayback();
+      return;
+    }
+
+    state.currentFrameIndex += 1;
+    renderFrame();
+  }
+
+  function schedulePlayback() {
+    if (!state.playing) {
+      return;
+    }
+
+    if (state.currentFrameIndex >= state.frames.length - 1) {
+      stopPlayback();
+      return;
+    }
+
+    state.timer = setTimeout(() => {
+      stepPlayback();
+      schedulePlayback();
+    }, getDelay());
+  }
+
+  function togglePlayback() {
+    if (!state.frames.length) {
+      return;
+    }
+
+    if (state.playing) {
+      stopPlayback();
+    } else {
+      state.playing = true;
+      dom.playBtn.textContent = "Pause";
+      schedulePlayback();
+    }
+  }
+
+  function resetAnimation() {
+    stopPlayback();
+    state.currentFrameIndex = 0;
+    renderFrame();
+  }
+
+  function solveCurrentMatrix() {
+    try {
+      const matrix = readMatrix();
+      const result = solveBranchAndBound(matrix);
+      state.result = result;
+      state.frames = result.frames;
+      state.currentFrameIndex = 0;
+      renderFrame();
+      dom.boardSummary.textContent = result.bestCost == null
+        ? "Search finished, but the current matrix has no feasible Hamiltonian tour."
+        : `Search finished. The best tour cost is ${result.bestCost}. You can now play the frames to inspect expansions and pruning.`;
+      stopPlayback();
+    } catch (error) {
+      window.alert(error.message);
+    }
+  }
+
+  document.getElementById("buildMatrixBtn").addEventListener("click", () => {
+    const size = Number(dom.cityCount.value);
+    if (!Number.isInteger(size) || size < 4 || size > 8) {
+      window.alert("Please enter an integer city count between 4 and 8.");
+      return;
+    }
+    buildEditableMatrix(size);
+    state.frames = [];
+    state.currentFrameIndex = 0;
+    state.result = null;
+    stopPlayback();
+    renderFrame();
+  });
+
+  document.getElementById("loadSampleBtn").addEventListener("click", () => {
+    fillMatrix(sampleMatrix);
+    state.frames = [];
+    state.currentFrameIndex = 0;
+    state.result = null;
+    stopPlayback();
+    renderFrame();
+  });
+
+  document.getElementById("solveBtn").addEventListener("click", solveCurrentMatrix);
+  document.getElementById("playBtn").addEventListener("click", togglePlayback);
+  document.getElementById("stepBtn").addEventListener("click", () => {
+    stopPlayback();
+    stepPlayback();
+  });
+  document.getElementById("resetBtn").addEventListener("click", resetAnimation);
+
+  dom.speedRange.addEventListener("input", () => {
+    state.speed = Number(dom.speedRange.value);
+    dom.speedLabel.textContent = SPEED_LABELS[state.speed];
+  });
+
+  fillMatrix(sampleMatrix);
+  state.speed = Number(dom.speedRange.value);
+  renderFrame();
+</script>
+</body>
+</html>
